@@ -1,0 +1,4 @@
+yeelight
+websockets
+python-dotenv
+pywebview
