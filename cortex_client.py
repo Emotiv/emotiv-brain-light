@@ -20,8 +20,10 @@ import websockets
 from config import Config
 from settings import settings
 
-# Cortex renamed "attention" to "foc"; accept both.
-METRIC_ALIASES = {"attention": "foc"}
+# Cortex 4.8 emits this metric as "attention" (verified against the live `met`
+# schema). Some builds call it "foc" instead, so that spelling is folded onto
+# the same key rather than being treated as a separate metric.
+METRIC_ALIASES = {"foc": "attention"}
 
 # Steps the UI draws as a status pipeline.
 STEP_CREDENTIALS = "credentials"

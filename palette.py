@@ -21,7 +21,7 @@ PERFORMANCE_METRIC_COLORS: Dict[str, str] = {
     "str": "#a781f3",   # Stress
     "rel": "#5ab0ee",   # Relaxation
     "int": "#f2974e",   # Interest
-    "foc": "#50e17d",   # Attention (Cortex key "foc"; EmotivPRO labels it Focus)
+    "attention": "#50e17d",   # Attention (EmotivPRO labels it Focus)
     "lex": "#404040",   # Long-term excitement (no colour of its own; reuses boredom's)
 }
 
