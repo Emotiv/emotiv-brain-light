@@ -107,8 +107,23 @@ def main():
         except Exception:
             pass
 
+    def on_loaded():
+        # Surface a frontend bootstrap failure on stderr too, so a packaged build
+        # can be diagnosed from the console instead of a blank window.
+        try:
+            error = window.evaluate_js("window.__bootError || ''")
+            if error:
+                print(f"[ui] bootstrap error: {error}", file=sys.stderr)
+        except Exception:
+            pass
+
+    window.events.loaded += on_loaded
     window.events.closing += on_closing
-    webview.start()
+    # http_server=True serves ui/ from 127.0.0.1 instead of handing WebKit a
+    # file:// URL. In a packaged .app the file:// load fails silently (the page
+    # never fires `loaded` and the window stays blank), and the bundle path
+    # contains spaces, which makes it worse. The server binds to localhost only.
+    webview.start(http_server=True)
 
 
 if __name__ == "__main__":

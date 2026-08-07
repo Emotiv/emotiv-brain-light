@@ -130,19 +130,55 @@ besides Neutral, **and trained on the same headset model** — an EPOC X profile
 will not load on an Insight (Cortex returns `-32226`, and the app explains that
 on screen).
 
-## Installer
+## Packaged builds
 
-The code is ready for it; the packaging itself has not been done or tested.
-What is already handled:
+`.github/workflows/build.yml` builds both platforms on GitHub Actions. Run it
+from the **Actions** tab, or push a `v*` tag to attach the results to a release.
 
-- `resource_dir()` in `app.py` resolves `sys._MEIPASS`, so the files under `ui/`
-  work inside a PyInstaller bundle.
-- Nothing depends on `.env`: everything the user configures goes through the UI
-  and into `~/.emotiv_brain_light`.
-- Credentials are typed by the user, never baked into the binary.
+| Platform | Output |
+|---|---|
+| macOS (Apple Silicon) | `EMOTIV-Brain-Light-macos-arm64.dmg` |
+| Windows (x64) | `EMOTIV-Brain-Light-windows-x64.zip` |
 
-Still missing: writing the `.spec`, signing/notarising on macOS, and shipping
-`certificates/rootCA.pem` as a data file.
+Python and every library ship inside the bundle — end users install nothing.
+**EMOTIV Launcher is still required**, because Cortex is what the app talks to;
+packaging only removes the Python setup, not the EMOTIV software.
+
+To build locally:
+
+```bash
+.venv/bin/pip install pyinstaller
+.venv/bin/pyinstaller packaging/EmotivBrainLight.spec --noconfirm
+```
+
+### Opening an unsigned build
+
+Neither build is code-signed, so both operating systems will push back the first
+time.
+
+**macOS** — Gatekeeper refuses a quarantined unsigned app. Either right-click
+the app and choose *Open* (then *Open* again in the dialog), or strip the
+quarantine flag:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/EMOTIV Brain Light.app"
+```
+
+macOS will also ask for **local network** permission on first run. Allow it —
+without that the app cannot reach the bulb or Cortex.
+
+**Windows** — SmartScreen shows "Windows protected your PC". Click *More info* →
+*Run anyway*. The app needs the WebView2 runtime, which ships with Edge on
+Windows 10 and 11.
+
+Signing would remove both prompts, but needs an Apple Developer ID certificate
+and a Windows code-signing certificate. Add `codesign_identity` in the spec and a
+notarisation step to the workflow once those exist.
+
+### Architecture coverage
+
+The macOS build is **arm64 only** — it will not run on Intel Macs. The Windows
+build is x64. Add runners to the matrix in the workflow if you need more.
 
 ## Command line
 

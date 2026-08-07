@@ -566,7 +566,34 @@ function wire() {
   );
 }
 
+// A blank window with no explanation is the worst possible failure mode, so any
+// bootstrap error gets painted on the page and stashed for the Python side.
+function fatalScreen(message) {
+  window.__bootError = String(message);
+  document.body.innerHTML =
+    '<div style="padding:48px;font:14px/1.7 -apple-system,sans-serif;color:#f2f4f8">' +
+    '<h1 style="font-size:18px;margin-bottom:12px">The interface failed to start</h1>' +
+    '<pre style="white-space:pre-wrap;color:#ff5468;font-size:12px">' +
+    window.__bootError.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c])) +
+    "</pre></div>";
+}
+
+window.addEventListener("error", (e) => fatalScreen(e.message + " @ " + e.filename + ":" + e.lineno));
+window.addEventListener("unhandledrejection", (e) => fatalScreen(e.reason));
+
 window.addEventListener("pywebviewready", () => {
-  wire();
-  boot();
+  try {
+    wire();
+    boot();
+  } catch (e) {
+    fatalScreen(e && e.stack ? e.stack : e);
+  }
 });
+
+// If the pywebview bridge never announces itself, say so instead of sitting on
+// an empty window forever.
+setTimeout(() => {
+  if (!window.pywebview || !window.pywebview.api) {
+    fatalScreen("window.pywebview.api was never injected (pywebviewready did not fire).");
+  }
+}, 8000);
