@@ -31,8 +31,8 @@ From the `performanceMetrics` table inside the EmotivPRO binary:
 | Excitement | `exc` | `#e9cc40` | yes |
 | Stress | `str` | `#a781f3` | yes |
 | Interest | `int` | `#f2974e` | yes |
+| Attention | `attention` | `#50e17d` | yes |
 | Relaxation | `rel` | `#5ab0ee` | no |
-| Attention | `attention` | `#50e17d` | no |
 
 `PERFORMANCE_METRIC_KEYS` in `palette.py` is the single gate: a metric absent
 from that list is neither displayed nor allowed to pick a colour. The colour

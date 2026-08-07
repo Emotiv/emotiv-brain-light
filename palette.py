@@ -48,7 +48,7 @@ NEUTRAL_COLOR = "#ff0066"
 # gate: a metric absent from here is neither shown nor allowed to pick a colour.
 # The colour table above deliberately keeps every official entry, so re-enabling
 # one is a matter of adding its key back.
-PERFORMANCE_METRIC_KEYS = ["eng", "exc", "str", "int"]
+PERFORMANCE_METRIC_KEYS = ["eng", "exc", "str", "int", "attention"]
 
 
 def hex_to_rgb(value: str) -> Tuple[int, int, int]:
