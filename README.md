@@ -25,14 +25,23 @@ EmotivBCI.
 
 From the `performanceMetrics` table inside the EmotivPRO binary:
 
-| Metric | Cortex key | Colour |
-|---|---|---|
-| Engagement | `eng` | `#2ec6c8` |
-| Excitement | `exc` | `#e9cc40` |
-| Stress | `str` | `#a781f3` |
-| Relaxation | `rel` | `#5ab0ee` |
-| Interest | `int` | `#f2974e` |
-| Focus | `foc` | `#50e17d` |
+| Metric | Cortex key | Colour | In use |
+|---|---|---|---|
+| Engagement | `eng` | `#2ec6c8` | yes |
+| Excitement | `exc` | `#e9cc40` | yes |
+| Stress | `str` | `#a781f3` | yes |
+| Interest | `int` | `#f2974e` | yes |
+| Relaxation | `rel` | `#5ab0ee` | no |
+| Focus | `foc` | `#50e17d` | no |
+
+`PERFORMANCE_METRIC_KEYS` in `palette.py` is the single gate: a metric absent
+from that list is neither displayed nor allowed to pick a colour. The colour
+table keeps every official entry, so re-enabling one is a matter of adding its
+key back.
+
+A metric goes quiet whenever Cortex marks it inactive and stops sending a value.
+The bar then **holds its last reading** rather than dropping to zero, so a
+temporary dropout does not read as "this metric collapsed".
 
 ### Mental Commands
 

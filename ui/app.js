@@ -336,7 +336,10 @@ function applyTarget(data) {
   renderLeader();
 
   if (state.mode === "metrics") {
-    state.scores = data.scores || {};
+    // Cortex drops a metric from the sample while it is inactive. Replacing the
+    // whole object would blank that bar; merging keeps the last known reading on
+    // screen until a fresh one arrives.
+    state.scores = { ...state.scores, ...(data.scores || {}) };
     updateMetricBars();
   } else {
     const power = data.power || 0;
@@ -444,6 +447,9 @@ window.pushEvent = function (event, data) {
       break;
     case "running":
       state.running = data.running;
+      // A new session starts from a clean slate — held-over readings from the
+      // previous run would be stale, not "last known".
+      if (data.running) state.scores = {};
       if (!data.running) {
         state.selectedHeadset = "";
         state.loadedProfile = "";
@@ -567,21 +573,36 @@ function wire() {
 }
 
 // A blank window with no explanation is the worst possible failure mode, so any
-// bootstrap error gets painted on the page and stashed for the Python side.
+// bootstrap error is painted on screen and stashed for the Python side. The
+// notice is an overlay rather than a body rewrite: a bridge that shows up late
+// on a slow machine can still recover, and the app DOM underneath survives.
 function fatalScreen(message) {
   window.__bootError = String(message);
-  document.body.innerHTML =
-    '<div style="padding:48px;font:14px/1.7 -apple-system,sans-serif;color:#f2f4f8">' +
+  let box = document.getElementById("fatal-notice");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "fatal-notice";
+    box.className = "overlay";
+    document.body.appendChild(box);
+  }
+  const safe = window.__bootError.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]));
+  box.innerHTML =
+    '<div class="welcome-card" style="text-align:left">' +
     '<h1 style="font-size:18px;margin-bottom:12px">The interface failed to start</h1>' +
-    '<pre style="white-space:pre-wrap;color:#ff5468;font-size:12px">' +
-    window.__bootError.replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c])) +
-    "</pre></div>";
+    '<pre style="white-space:pre-wrap;color:#ff5468;font-size:12px;margin:0">' + safe + "</pre></div>";
+}
+
+function clearFatalScreen() {
+  const box = document.getElementById("fatal-notice");
+  if (box) box.remove();
+  window.__bootError = "";
 }
 
 window.addEventListener("error", (e) => fatalScreen(e.message + " @ " + e.filename + ":" + e.lineno));
 window.addEventListener("unhandledrejection", (e) => fatalScreen(e.reason));
 
 window.addEventListener("pywebviewready", () => {
+  clearFatalScreen();
   try {
     wire();
     boot();

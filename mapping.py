@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, Tuple
 from palette import (
     NEUTRAL_COLOR,
     PERFORMANCE_METRIC_COLORS,
+    PERFORMANCE_METRIC_KEYS,
     hex_to_hsv,
     slot_color,
 )
@@ -114,7 +115,7 @@ class PerformanceMetricsMapper:
 
         scores: Dict[str, float] = {}
         for name, value in values.items():
-            if name in self.config.IGNORE_METRICS or name not in PERFORMANCE_METRIC_COLORS:
+            if name in self.config.IGNORE_METRICS or name not in PERFORMANCE_METRIC_KEYS:
                 continue
             if active.get(name, True) is False:
                 continue

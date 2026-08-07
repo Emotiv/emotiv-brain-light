@@ -44,8 +44,11 @@ MENTAL_COMMAND_SLOT_COLORS: List[str] = [
 
 NEUTRAL_COLOR = "#ff0066"
 
-# Metric keys in EmotivPRO's display order (the UI translates from here).
-PERFORMANCE_METRIC_KEYS = ["eng", "exc", "str", "rel", "int", "foc"]
+# The metrics the app actually uses, in display order. This list is the single
+# gate: a metric absent from here is neither shown nor allowed to pick a colour.
+# The colour table above deliberately keeps every official entry, so re-enabling
+# one is a matter of adding its key back.
+PERFORMANCE_METRIC_KEYS = ["eng", "exc", "str", "int"]
 
 
 def hex_to_rgb(value: str) -> Tuple[int, int, int]:
