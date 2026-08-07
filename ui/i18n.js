@@ -105,7 +105,7 @@ const I18N = {
     "metric.str": "Stress",
     "metric.rel": "Relaxation",
     "metric.int": "Interest",
-    "metric.foc": "Focus",
+    "metric.foc": "Attention",
     "metric.lex": "Long-term excitement",
 
     "action.neutral": "Neutral",
@@ -290,7 +290,7 @@ const I18N = {
     "metric.str": "压力",
     "metric.rel": "放松度",
     "metric.int": "兴趣度",
-    "metric.foc": "专注度",
+    "metric.foc": "注意力",
     "metric.lex": "长期兴奋度",
 
     "action.neutral": "中性",
