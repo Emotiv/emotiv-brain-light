@@ -25,18 +25,17 @@ class Config:
         "CORTEX_CERT_PATH",
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "certificates", "rootCA.pem"),
     )
-    # Credentials: .env (CORTEX_CLIENT_ID/SECRET) or the file already used by
-    # emotiv-brain-music (~/.emotiv_bridge/cortex_creds.json).
-    CORTEX_CLIENT_ID = os.getenv("CORTEX_CLIENT_ID")
-    CORTEX_CLIENT_SECRET = os.getenv("CORTEX_CLIENT_SECRET")
-    CORTEX_CREDS_PATH = os.path.expanduser(
-        os.getenv("CORTEX_CREDS_PATH", "~/.emotiv_bridge/cortex_creds.json")
-    )
+    # Credentials are not read from here: the user types them into Settings and
+    # they live in ~/.emotiv_brain_light/settings.json. A packaged build has no
+    # .env, so that is the only source.
     # Specific headset; empty = fall back to the first one found.
     HEADSET_ID = os.getenv("HEADSET_ID", "")
 
     # ----------------------------------------------------------------- Bulb
-    BULB_IP = os.getenv("BULB_IP", "192.168.3.154")
+    # Deliberately empty: with no configured bulb the UI must ask for the
+    # address (or offer the network scan). A baked-in default would send a fresh
+    # install chasing an IP from someone else's network.
+    BULB_IP = os.getenv("BULB_IP", "")
     BULB_PORT = _i("BULB_PORT", 55443)
     # This machine's LAN IP, for music mode (the bulb connects back to us).
     # Empty = let the library discover it.

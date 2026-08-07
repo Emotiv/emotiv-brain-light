@@ -413,14 +413,29 @@ class CortexClient:
             )
             self.session_id = res.get("id")
         except CortexError as e:
-            # Defensive recovery from -32005 ("session already exists").
+            # Defensive recovery from -32005 ("session already exists"). Cortex
+            # takes a moment to retire a session it just closed, so a single
+            # re-query can come back empty and leave the user clicking the
+            # headset twice. Give it a couple of tries before giving up.
             if str(e.params.get("api_code")) == "-32005" or "exist" in str(e.params.get("detail", "")).lower():
-                sessions = await self._send("querySessions", {"cortexToken": self.token})
-                mine = [s for s in sessions if s.get("headsetId") == self.headset_id]
-                if mine:
-                    self.session_id = mine[0]["id"]
-                    self._status(STEP_SESSION, "ok", "status.session_recovered")
-                    return
+                for attempt in range(3):
+                    await asyncio.sleep(1.0 * attempt)
+                    sessions = await self._send("querySessions", {"cortexToken": self.token})
+                    mine = [s for s in sessions if s.get("headsetId") == self.headset_id] if isinstance(sessions, list) else []
+                    if mine:
+                        self.session_id = mine[0]["id"]
+                        self._status(STEP_SESSION, "ok", "status.session_recovered")
+                        return
+                    try:
+                        res = await self._send(
+                            "createSession",
+                            {"cortexToken": self.token, "headset": self.headset_id, "status": "active"},
+                        )
+                        self.session_id = res.get("id")
+                        self._status(STEP_SESSION, "ok", "status.session_created")
+                        return
+                    except CortexError:
+                        continue
             self._status(STEP_SESSION, "error", e.code, **e.params)
             raise
 

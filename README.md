@@ -151,21 +151,45 @@ To build locally:
 .venv/bin/pyinstaller packaging/EmotivBrainLight.spec --noconfirm
 ```
 
-### Opening an unsigned build
+### Installing on a clean machine
 
-Neither build is code-signed, so both operating systems will push back the first
-time.
+**Prerequisites, in order:**
 
-**macOS** — Gatekeeper refuses a quarantined unsigned app. Either right-click
-the app and choose *Open* (then *Open* again in the dialog), or strip the
-quarantine flag:
+1. **EMOTIV Launcher installed, signed in, and running.** The app talks to the
+   Cortex service it provides. Packaging removes the Python setup, not this.
+2. **A Cortex application** at emotiv.com/my-account/cortex-apps, to get a
+   Client ID and secret. Each person needs their own, or shares one.
+3. **The bulb on the same subnet with LAN Control enabled** in the Xiaomi Home
+   app, joined to a 2.4 GHz network.
+
+**Installing on macOS** — do not run the app from the mounted disk image. The
+DMG volume is mounted read-only and flagged `quarantine`, so Gatekeeper blocks
+it there and the flag cannot even be removed. Drag the app to `/Applications`
+first, then:
 
 ```bash
 xattr -dr com.apple.quarantine "/Applications/EMOTIV Brain Light.app"
 ```
 
-macOS will also ask for **local network** permission on first run. Allow it —
-without that the app cannot reach the bulb or Cortex.
+On macOS 15 and newer the old right-click → *Open* trick no longer works for
+unnotarised apps. The GUI route is **System Settings → Privacy & Security →
+Open Anyway**, right after the blocked attempt.
+
+macOS asks for **local network** permission on first run — allow it, or the app
+reaches neither the bulb nor Cortex.
+
+The macOS **application firewall** does not need a rule: PyInstaller ad-hoc signs
+the bundle, and the firewall's default "automatically allow downloaded signed
+software" covers it. Music mode needs the bulb to open a connection *back* to
+this machine, so if that setting is off, allow the app when prompted.
+
+**Installing on Windows** — unzip the whole folder and run
+`EMOTIV Brain Light.exe` from inside it; the executable depends on the
+`_internal/` folder beside it. SmartScreen shows "Windows protected your PC" the
+first time: *More info* → *Run anyway*.
+
+**First run** asks for a language, then the Cortex credentials under
+**Settings**. Leave the bulb IP blank and press **Scan network** to find it.
 
 **Windows** — SmartScreen shows "Windows protected your PC". Click *More info* →
 *Run anyway*. The app needs the WebView2 runtime, which ships with Edge on
