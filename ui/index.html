@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>EMOTIV → Yeelight</title>
+<title>EMOTIV Brain Light</title>
 <link rel="stylesheet" href="app.css" />
 </head>
 <body>
@@ -12,18 +12,36 @@
 <div id="welcome" class="overlay hidden">
   <div class="welcome-card">
     <div class="orb-mini"></div>
-    <h1 data-i18n="welcome.title">Choose your language</h1>
-    <div class="lang-grid">
-      <button class="lang-btn" data-lang="en">
-        <span class="lang-flag">EN</span>
-        <span class="lang-name">English</span>
-      </button>
-      <button class="lang-btn" data-lang="zh">
-        <span class="lang-flag">中</span>
-        <span class="lang-name">中文</span>
-      </button>
+
+    <div id="welcome-language">
+      <h1 data-i18n="welcome.title">Choose your language</h1>
+      <div class="lang-grid">
+        <button class="lang-btn" data-lang="en">
+          <span class="lang-flag">EN</span>
+          <span class="lang-name">English</span>
+        </button>
+        <button class="lang-btn" data-lang="zh">
+          <span class="lang-flag">中</span>
+          <span class="lang-name">中文</span>
+        </button>
+      </div>
+      <p class="muted" data-i18n="welcome.hint"></p>
     </div>
-    <p class="muted" data-i18n="welcome.hint"></p>
+
+    <div id="welcome-brand" class="hidden">
+      <h1 data-i18n="welcome.brand.title"></h1>
+      <div class="lang-grid">
+        <button class="lang-btn brand-btn" data-brand="yeelight">
+          <span class="lang-flag">Yeelight</span>
+          <span class="lang-name" data-i18n="brand.yeelight.desc"></span>
+        </button>
+        <button class="lang-btn brand-btn" data-brand="lifx">
+          <span class="lang-flag">LIFX</span>
+          <span class="lang-name" data-i18n="brand.lifx.desc"></span>
+        </button>
+      </div>
+      <p class="muted small" data-i18n="welcome.brand.hint"></p>
+    </div>
   </div>
 </div>
 
@@ -153,7 +171,12 @@
 
       <section class="field-group">
         <h3 data-i18n="setup.bulb"></h3>
-        <p class="muted small" data-i18n="setup.bulb.hint"></p>
+        <label data-i18n="setup.brand"></label>
+        <select id="in-brand">
+          <option value="yeelight">Yeelight</option>
+          <option value="lifx">LIFX</option>
+        </select>
+        <p class="muted small" id="brand-hint"></p>
         <label data-i18n="setup.bulb_ip"></label>
         <div class="row-gap">
           <input type="text" id="in-bulb-ip" spellcheck="false" autocomplete="off" />

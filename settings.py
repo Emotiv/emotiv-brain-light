@@ -14,6 +14,7 @@ SETTINGS_PATH = os.path.join(APP_DIR, "settings.json")
 
 DEFAULTS: Dict[str, Any] = {
     "language": None,        # None = not chosen yet, triggers the language screen
+    "light_brand": None,     # None = not chosen yet, triggers the brand screen
     "client_id": "",
     "client_secret": "",
     "bulb_ip": "",

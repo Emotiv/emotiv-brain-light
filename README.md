@@ -1,7 +1,8 @@
 # emotiv-brain-light
 
-EMOTIV Cortex driving a **Yeelight YLDP06YL** (Color Bulb E27, 2019) in real
-time, with a desktop UI in English and Chinese.
+EMOTIV Cortex driving a **smart light** in real time, with a desktop UI in
+English and Chinese. Yeelight and LIFX are supported; the brand is chosen on
+first run.
 
 Two modes:
 
@@ -58,6 +59,30 @@ Profiles with more than four trained actions continue through the rest of the
 EmotivPRO chart palette — that part is our choice, since the official app does
 not go that far.
 
+## Supported lights
+
+| Brand | Protocol | Update ceiling | Verified |
+|---|---|---|---|
+| Yeelight | JSON over TCP 55443, music mode | 25/s (ours) | on a YLDP06YL |
+| LIFX | LIFX LAN, binary over UDP 56700 | 20/s (protocol) | **not on hardware** |
+
+The brand is picked on first run and can be changed under Settings. Only
+`lights/` knows which brand is in play — the engine, the mapping and the UI
+work the same either way, and `LightError` carries a translation code so the
+engine never has to recognise a vendor's error string.
+
+**The LIFX driver has never driven a real LIFX device.** It was written against
+the published protocol and its encoder is verified byte-for-byte against the
+worked example in the documentation (36-byte header, `size=49`, `proto=0x1400`,
+type 102 for SetColor), exercised against a fake device that speaks the
+protocol back. That is not the same as working. Treat the first run on real
+hardware as the test.
+
+Two things differ in practice. LIFX needs no equivalent of music mode: its
+ceiling is 20 messages/second and one `SetColor` carries the whole HSBK, so a
+frame is a single packet instead of two. And `SetColor` has a `duration` field,
+so the light interpolates between our frames on its own.
+
 ## Architecture
 
 ```
@@ -66,7 +91,8 @@ app.py            pywebview window + the API exposed to JS
      ├─ cortex_client.py   Cortex WebSocket: handshake, profiles, met, com
      ├─ mapping.py         data -> HSV target (one mapper per mode)
      ├─ palette.py         official palettes + colour conversions
-     └─ bulb_driver.py     music mode + interpolation at 25 fps
+     └─ bulb_driver.py     brand-agnostic smoothing, easing and reconnect
+         └─ lights/        one transport per brand (yeelight, lifx)
 ui/               index.html, app.css, app.js, i18n.js
 settings.py       what the user configures, in ~/.emotiv_brain_light
 config.py         developer defaults (env vars / .env)
@@ -123,6 +149,7 @@ credentials, language, bulb IP, last headset and last profile.
 
 ## How it is used
 
+0. **First run** asks for a language, then which light brand you have.
 1. **Start** — connects to Cortex, authorises, and **lists the headsets**. It
    stops there.
 2. **Pick a headset** from the list. There is a **Refresh** button to rescan.
@@ -168,8 +195,8 @@ To build locally:
    Cortex service it provides. Packaging removes the Python setup, not this.
 2. **A Cortex application** at emotiv.com/my-account/cortex-apps, to get a
    Client ID and secret. Each person needs their own, or shares one.
-3. **The bulb on the same subnet with LAN Control enabled** in the Xiaomi Home
-   app, joined to a 2.4 GHz network.
+3. **The light on the same subnet.** Yeelight also needs LAN Control enabled in
+   its app and a 2.4 GHz network; LIFX needs nothing beyond the same network.
 
 **Installing on macOS** — do not run the app from the mounted disk image. The
 DMG volume is mounted read-only and flagged `quarantine`, so Gatekeeper blocks
@@ -208,7 +235,31 @@ Signing would remove both prompts, but needs an Apple Developer ID certificate
 and a Windows code-signing certificate. Add `codesign_identity` in the spec and a
 notarisation step to the workflow once those exist.
 
-### Architecture coverage
+### Supported lights
+
+| Brand | Protocol | Update ceiling | Verified |
+|---|---|---|---|
+| Yeelight | JSON over TCP 55443, music mode | 25/s (ours) | on a YLDP06YL |
+| LIFX | LIFX LAN, binary over UDP 56700 | 20/s (protocol) | **not on hardware** |
+
+The brand is picked on first run and can be changed under Settings. Only
+`lights/` knows which brand is in play — the engine, the mapping and the UI
+work the same either way, and `LightError` carries a translation code so the
+engine never has to recognise a vendor's error string.
+
+**The LIFX driver has never driven a real LIFX device.** It was written against
+the published protocol and its encoder is verified byte-for-byte against the
+worked example in the documentation (36-byte header, `size=49`, `proto=0x1400`,
+type 102 for SetColor), exercised against a fake device that speaks the
+protocol back. That is not the same as working. Treat the first run on real
+hardware as the test.
+
+Two things differ in practice. LIFX needs no equivalent of music mode: its
+ceiling is 20 messages/second and one `SetColor` carries the whole HSBK, so a
+frame is a single packet instead of two. And `SetColor` has a `duration` field,
+so the light interpolates between our frames on its own.
+
+## Architecture coverage
 
 The macOS build is **arm64 only** — it will not run on Intel Macs. The Windows
 build is x64. Add runners to the matrix in the workflow if you need more.

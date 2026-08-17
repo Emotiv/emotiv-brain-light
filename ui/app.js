@@ -40,6 +40,7 @@ function applyStaticI18n() {
   renderProfileOptions();
   renderHeadsets();
   renderProfiles();
+  if ($("#in-brand")) syncBrandHint();
 }
 
 // ─── Buttons / status ─────────────────────────────────────────────────────
@@ -373,8 +374,15 @@ function renderProfileOptions() {
   $("#no-profiles-note").classList.toggle("hidden", state.profiles.length > 0);
 }
 
+function syncBrandHint() {
+  const brand = $("#in-brand").value || "yeelight";
+  $("#brand-hint").textContent = t("setup.bulb.hint." + brand);
+}
+
 function fillSettingsForm() {
   const s = state.settings;
+  $("#in-brand").value = s.light_brand || "yeelight";
+  syncBrandHint();
   $("#in-client-id").value = s.client_id || "";
   $("#in-client-secret").value = "";
   $("#secret-saved-note").classList.toggle("hidden", !s.client_secret_set);
@@ -396,6 +404,7 @@ function syncTuningLabels() {
 async function saveSettings() {
   const payload = {
     client_id: $("#in-client-id").value.trim(),
+    light_brand: $("#in-brand").value,
     bulb_ip: $("#in-bulb-ip").value.trim(),
     profile: $("#in-profile").value,
     score_mode: $("#in-score-mode").value,
@@ -466,6 +475,23 @@ window.pushEvent = function (event, data) {
   }
 };
 
+// ─── First-run wizard ─────────────────────────────────────────────────────
+function showWelcomeStep(step) {
+  $("#welcome").classList.remove("hidden");
+  $("#app").classList.add("hidden");
+  $("#welcome-language").classList.toggle("hidden", step !== "language");
+  $("#welcome-brand").classList.toggle("hidden", step !== "brand");
+}
+
+function finishWelcome() {
+  $("#welcome").classList.add("hidden");
+  $("#app").classList.remove("hidden");
+  applyStaticI18n();
+  renderMode();
+  fillSettingsForm();
+  renderLog();
+}
+
 // ─── Bootstrap ────────────────────────────────────────────────────────────
 async function boot() {
   const info = await window.pywebview.api.get_state();
@@ -475,10 +501,13 @@ async function boot() {
   state.profiles = info.profiles || [];
 
   if (!info.settings.language) {
-    $("#welcome").classList.remove("hidden");
+    showWelcomeStep("language");
   } else {
     setLang(info.settings.language);
-    $("#app").classList.remove("hidden");
+    // An install that predates the brand picker lands here with a language but
+    // no brand; send it straight to the step it is missing.
+    if (!info.settings.light_brand) showWelcomeStep("brand");
+    else $("#app").classList.remove("hidden");
   }
 
   applyStaticI18n();
@@ -488,16 +517,20 @@ async function boot() {
 }
 
 function wire() {
-  $$(".lang-btn").forEach((btn) =>
+  $$("#welcome-language .lang-btn").forEach((btn) =>
     btn.addEventListener("click", async () => {
       setLang(btn.dataset.lang);
       state.settings = await window.pywebview.api.save_settings({ language: btn.dataset.lang });
-      $("#welcome").classList.add("hidden");
-      $("#app").classList.remove("hidden");
       applyStaticI18n();
-      renderMode();
-      fillSettingsForm();
-      renderLog();
+      if (state.settings.light_brand) finishWelcome();
+      else showWelcomeStep("brand");
+    })
+  );
+
+  $$(".brand-btn").forEach((btn) =>
+    btn.addEventListener("click", async () => {
+      state.settings = await window.pywebview.api.save_settings({ light_brand: btn.dataset.brand });
+      finishWelcome();
     })
   );
 
@@ -570,6 +603,8 @@ function wire() {
   ["#in-smooth", "#in-bright-min", "#in-bright-max"].forEach((sel) =>
     $(sel).addEventListener("input", syncTuningLabels)
   );
+
+  $("#in-brand").addEventListener("change", syncBrandHint);
 }
 
 // A blank window with no explanation is the worst possible failure mode, so any

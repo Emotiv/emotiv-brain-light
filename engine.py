@@ -9,6 +9,7 @@ import time
 from typing import Any, Callable, Dict, Optional
 
 from bulb_driver import SmoothBulb, find_bulb_ip
+from lights import DEFAULT_BRAND, LightError
 from config import Config
 from cortex_client import CortexClient
 from mapping import MentalCommandMapper, PerformanceMetricsMapper
@@ -102,14 +103,18 @@ class Engine:
             self._status(STEP_BULB, "error", "err.no_bulb_ip")
             return False
 
+        brand = settings.get("light_brand") or DEFAULT_BRAND
         self._status(STEP_BULB, "pending", "status.connecting_bulb", ip=ip)
-        bulb = SmoothBulb(ip)
+        bulb = SmoothBulb(ip, brand=brand)
         try:
             bulb.connect(attempts=3)
+        except LightError as e:
+            # The transport already chose a translatable code, so the engine
+            # never has to recognise a vendor's error string.
+            self._status(STEP_BULB, "error", e.code, ip=ip, **e.params)
+            return False
         except Exception as e:
-            detail = str(e)
-            code = "err.bulb_music_busy" if "-5000" in detail else "err.bulb_unreachable"
-            self._status(STEP_BULB, "error", code, ip=ip, detail=detail)
+            self._status(STEP_BULB, "error", "err.bulb_unreachable", ip=ip, detail=str(e))
             return False
 
         bulb.start()

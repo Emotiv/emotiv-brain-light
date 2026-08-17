@@ -93,6 +93,9 @@ body::before {
 }
 .lang-btn:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.22); transform: translateY(-2px); }
 .lang-flag { font-size: 24px; font-weight: 600; letter-spacing: 0.5px; }
+.brand-btn .lang-flag { font-size: 19px; }
+.brand-btn .lang-name { font-size: 12px; line-height: 1.4; text-align: center; }
+#welcome-brand h1 { margin-top: 20px; }
 .lang-name { color: var(--fg-dim); }
 
 /* ─── Topbar ─────────────────────────────────────────────────────────────── */

@@ -5,12 +5,21 @@ const I18N = {
   en: {
     "lang.name": "English",
 
-    "app.title": "EMOTIV → Yeelight",
-    "app.subtitle": "Drive a smart bulb with your brain",
+    "app.title": "EMOTIV Brain Light",
+    "app.subtitle": "Drive a smart light with your brain",
 
     "welcome.title": "Choose your language",
     "welcome.hint": "You can change this any time from the header.",
     "welcome.continue": "Continue",
+    "welcome.brand.title": "Which light do you have?",
+    "welcome.brand.hint": "You can change this later under Settings.",
+    "brand.yeelight.desc": "Wi-Fi bulb with LAN Control enabled",
+    "brand.lifx.desc": "LIFX LAN protocol — not yet tested on hardware",
+    "setup.brand": "Light brand",
+    "setup.bulb.hint.yeelight":
+      "Enable LAN Control in the Yeelight or Xiaomi Home app first. The light and this computer must be on the same network.",
+    "setup.bulb.hint.lifx":
+      "LIFX needs no extra setting — just the same network. This driver was written from the protocol spec and has not been tested against a real LIFX device yet.",
 
     "mode.metrics": "Performance Metrics",
     "mode.metrics.desc": "The strongest metric picks the colour",
@@ -57,8 +66,8 @@ const I18N = {
     "setup.client_id": "Client ID",
     "setup.client_secret": "Client secret",
     "setup.secret_saved": "A secret is already saved. Leave blank to keep it.",
-    "setup.bulb": "Yeelight bulb",
-    "setup.bulb_ip": "Bulb IP address",
+    "setup.bulb": "Smart light",
+    "setup.bulb_ip": "Light IP address",
     "setup.bulb.hint":
       "Enable LAN Control in the Xiaomi Home app first. The bulb and this computer must be on the same network.",
     "setup.profile": "Trained profile",
@@ -137,7 +146,7 @@ const I18N = {
     "status.discovering_bulb": "Scanning the network for bulbs…",
     "status.bulb_found": "Bulb found at {ip}",
     "status.connecting_bulb": "Connecting to the bulb at {ip}…",
-    "status.bulb_ready": "Bulb ready (music mode, no rate limit)",
+    "status.bulb_ready": "Light ready at {ip}",
 
     "err.no_credentials": "Enter your Cortex Client ID and secret in Setup.",
     "err.cortex_unreachable":
@@ -172,10 +181,10 @@ const I18N = {
     "err.mode_switch_failed": "Could not switch mode. {detail}",
     "err.no_bulb_ip": "Set the bulb IP address in Setup, or scan the network.",
     "err.no_bulb_found":
-      "No Yeelight found on this network. Check that LAN Control is enabled in the Xiaomi Home app.",
+      "No light found on this network. For Yeelight, check that LAN Control is enabled in the app.",
     "err.discover_failed": "Network scan failed: {detail}",
     "err.bulb_unreachable":
-      "Cannot reach the bulb at {ip}. Check the IP, that LAN Control is on, and that both devices are on the same network. ({detail})",
+      "Cannot reach the light at {ip}. Check the IP and that both devices are on the same network. For Yeelight, LAN Control must be on. ({detail})",
     "err.bulb_music_busy":
       "The bulb refused music mode. Another copy of this app is probably still running and holding it — close it and try again.",
 
@@ -190,12 +199,21 @@ const I18N = {
   zh: {
     "lang.name": "中文",
 
-    "app.title": "EMOTIV → Yeelight",
-    "app.subtitle": "用脑电控制智能灯泡",
+    "app.title": "EMOTIV Brain Light",
+    "app.subtitle": "用脑电控制智能灯具",
 
     "welcome.title": "请选择语言",
     "welcome.hint": "之后可以随时在顶部切换。",
     "welcome.continue": "继续",
+    "welcome.brand.title": "你使用哪种灯？",
+    "welcome.brand.hint": "之后可以在「设置」中更改。",
+    "brand.yeelight.desc": "已开启局域网控制的 Wi-Fi 灯泡",
+    "brand.lifx.desc": "LIFX 局域网协议 —— 尚未在真实设备上测试",
+    "setup.brand": "灯具品牌",
+    "setup.bulb.hint.yeelight":
+      "请先在 Yeelight 或米家 App 中开启「局域网控制」。灯具与本机需在同一网络。",
+    "setup.bulb.hint.lifx":
+      "LIFX 无需额外设置，只要在同一网络即可。此驱动依据协议文档编写，尚未在真实 LIFX 设备上验证。",
 
     "mode.metrics": "表现指标",
     "mode.metrics.desc": "由最强的指标决定颜色",
@@ -242,7 +260,7 @@ const I18N = {
     "setup.client_id": "Client ID",
     "setup.client_secret": "Client Secret",
     "setup.secret_saved": "已保存 Secret。留空则保持不变。",
-    "setup.bulb": "Yeelight 灯泡",
+    "setup.bulb": "智能灯具",
     "setup.bulb_ip": "灯泡 IP 地址",
     "setup.bulb.hint":
       "请先在米家 App 中开启「局域网控制」。灯泡与本机需在同一网络。",
@@ -322,7 +340,7 @@ const I18N = {
     "status.discovering_bulb": "正在扫描网络中的灯泡…",
     "status.bulb_found": "在 {ip} 找到灯泡",
     "status.connecting_bulb": "正在连接 {ip} 的灯泡…",
-    "status.bulb_ready": "灯泡就绪（音乐模式，无速率限制）",
+    "status.bulb_ready": "灯具就绪（{ip}）",
 
     "err.no_credentials": "请在「设置」中填写 Cortex Client ID 与 Secret。",
     "err.cortex_unreachable":
@@ -352,7 +370,7 @@ const I18N = {
     "err.actions_failed": "无法读取配置文件中已训练的动作。{detail}",
     "err.mode_switch_failed": "无法切换模式。{detail}",
     "err.no_bulb_ip": "请在「设置」中填写灯泡 IP，或扫描网络。",
-    "err.no_bulb_found": "本网络中未找到 Yeelight。请确认米家 App 中已开启「局域网控制」。",
+    "err.no_bulb_found": "本网络中未找到灯具。若使用 Yeelight，请确认已开启「局域网控制」。",
     "err.discover_failed": "网络扫描失败：{detail}",
     "err.bulb_unreachable":
       "无法连接 {ip} 的灯泡。请检查 IP、局域网控制是否开启，以及两台设备是否在同一网络。（{detail}）",

@@ -90,7 +90,7 @@ class Api:
 def main():
     api = Api()
     window = webview.create_window(
-        "EMOTIV → Yeelight",
+        "EMOTIV Brain Light",
         os.path.join(resource_dir(), "index.html"),
         js_api=api,
         width=1160,
