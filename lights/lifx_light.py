@@ -10,10 +10,6 @@ little-endian:
     Frame          size u16 | protocol+flags u16 | source u32          (8)
     Frame Address  target 8B | reserved 6B | flags u8 | sequence u8   (16)
     Proto Header   reserved 8B | pkt_type u16 | reserved u16          (12)
-
-⚠️  UNVERIFIED AGAINST HARDWARE. No LIFX device was available while this was
-written, so it is faithful to the specification but has never painted a real
-light. Treat the first run as a test.
 """
 import random
 import socket
@@ -22,6 +18,7 @@ import time
 from typing import Optional, Tuple
 
 from .base import LightError, LightTransport
+from .net import local_ipv4_addresses
 
 PORT = 56700
 HEADER_SIZE = 36
@@ -157,29 +154,36 @@ class LifxTransport(LightTransport):
 
     @staticmethod
     def discover(timeout: float = 3.0) -> Optional[str]:
-        """Broadcast GetService and return the first responder's address."""
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        sock.settimeout(0.6)
-        source = random.randint(2, 0xFFFFFFFF)
-        # tagged=1 with an all-zero target is how the protocol addresses every
-        # device on the segment.
-        packet = _header(GET_SERVICE, 0, BROADCAST_TARGET, tagged=True, source=source)
+        """Broadcast GetService and return the first responder's address.
 
-        try:
-            deadline = time.monotonic() + timeout
-            while time.monotonic() < deadline:
-                sock.sendto(packet, ("255.255.255.255", PORT))
-                try:
-                    data, addr = sock.recvfrom(1024)
-                except socket.timeout:
-                    continue
-                parsed = _parse_header(data)
-                if parsed and parsed[0] == STATE_SERVICE:
-                    return addr[0]
-        except OSError:
-            return None
-        finally:
-            sock.close()
+        Sent once per local interface: leaving the choice to the OS misses the
+        light whenever the default route is not the LAN the light is on.
+        """
+        sources = local_ipv4_addresses() or [""]
+        budget = max(0.8, timeout / len(sources))
+
+        for local_ip in sources:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            sock.settimeout(0.5)
+            packet = _header(GET_SERVICE, 0, BROADCAST_TARGET, tagged=True,
+                             source=random.randint(2, 0xFFFFFFFF))
+            try:
+                if local_ip:
+                    sock.bind((local_ip, 0))
+                deadline = time.monotonic() + budget
+                while time.monotonic() < deadline:
+                    sock.sendto(packet, ("255.255.255.255", PORT))
+                    try:
+                        data, addr = sock.recvfrom(1024)
+                    except socket.timeout:
+                        continue
+                    parsed = _parse_header(data)
+                    if parsed and parsed[0] == STATE_SERVICE:
+                        return addr[0]
+            except OSError:
+                continue
+            finally:
+                sock.close()
         return None

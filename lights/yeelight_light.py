@@ -10,6 +10,7 @@ from typing import Optional
 from yeelight import Bulb, BulbException, discover_bulbs
 
 from .base import LightError, LightTransport
+from .net import interface_names
 
 
 class YeelightTransport(LightTransport):
@@ -90,5 +91,18 @@ class YeelightTransport(LightTransport):
 
     @staticmethod
     def discover(timeout: float = 3.0) -> Optional[str]:
-        bulbs = discover_bulbs(timeout=int(timeout))
-        return bulbs[0]["ip"] if bulbs else None
+        # The default route is not always the one the bulb is on, and the
+        # library leaves the multicast interface to the OS. Ask the default
+        # first, then every interface by name.
+        attempts = [None] + interface_names()
+        per_try = max(1, int(timeout / max(1, len(attempts))))
+        for interface in attempts:
+            try:
+                bulbs = discover_bulbs(timeout=per_try, interface=interface or False)
+            except Exception:
+                # Interfaces with no IPv4 (utun, bridges) make the library raise
+                # rather than skip them. Not a reason to abandon the search.
+                continue
+            if bulbs:
+                return bulbs[0]["ip"]
+        return None

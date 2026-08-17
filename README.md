@@ -71,12 +71,10 @@ The brand is picked on first run and can be changed under Settings. Only
 work the same either way, and `LightError` carries a translation code so the
 engine never has to recognise a vendor's error string.
 
-**The LIFX driver has never driven a real LIFX device.** It was written against
-the published protocol and its encoder is verified byte-for-byte against the
-worked example in the documentation (36-byte header, `size=49`, `proto=0x1400`,
-type 102 for SetColor), exercised against a fake device that speaks the
-protocol back. That is not the same as working. Treat the first run on real
-hardware as the test.
+The LIFX encoder is verified byte-for-byte against the worked example in the
+protocol documentation (36-byte header, `size=49`, `proto=0x1400`, type 102 for
+SetColor) and exercised against a fake device that speaks the protocol back;
+hardware confirmation is still outstanding.
 
 Two things differ in practice. LIFX needs no equivalent of music mode: its
 ceiling is 20 messages/second and one `SetColor` carries the whole HSBK, so a

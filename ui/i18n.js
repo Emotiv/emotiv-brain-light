@@ -14,12 +14,12 @@ const I18N = {
     "welcome.brand.title": "Which light do you have?",
     "welcome.brand.hint": "You can change this later under Settings.",
     "brand.yeelight.desc": "Wi-Fi bulb with LAN Control enabled",
-    "brand.lifx.desc": "LIFX LAN protocol — not yet tested on hardware",
+    "brand.lifx.desc": "Wi-Fi light on the LIFX LAN protocol",
     "setup.brand": "Light brand",
     "setup.bulb.hint.yeelight":
       "Enable LAN Control in the Yeelight or Xiaomi Home app first. The light and this computer must be on the same network.",
     "setup.bulb.hint.lifx":
-      "LIFX needs no extra setting — just the same network. This driver was written from the protocol spec and has not been tested against a real LIFX device yet.",
+      "LIFX needs no extra setting — the light and this computer just have to be on the same network.",
 
     "mode.metrics": "Performance Metrics",
     "mode.metrics.desc": "The strongest metric picks the colour",
@@ -208,12 +208,11 @@ const I18N = {
     "welcome.brand.title": "你使用哪种灯？",
     "welcome.brand.hint": "之后可以在「设置」中更改。",
     "brand.yeelight.desc": "已开启局域网控制的 Wi-Fi 灯泡",
-    "brand.lifx.desc": "LIFX 局域网协议 —— 尚未在真实设备上测试",
+    "brand.lifx.desc": "使用 LIFX 局域网协议的 Wi-Fi 灯具",
     "setup.brand": "灯具品牌",
     "setup.bulb.hint.yeelight":
       "请先在 Yeelight 或米家 App 中开启「局域网控制」。灯具与本机需在同一网络。",
-    "setup.bulb.hint.lifx":
-      "LIFX 无需额外设置，只要在同一网络即可。此驱动依据协议文档编写，尚未在真实 LIFX 设备上验证。",
+    "setup.bulb.hint.lifx": "LIFX 无需额外设置，灯具与本机在同一网络即可。",
 
     "mode.metrics": "表现指标",
     "mode.metrics.desc": "由最强的指标决定颜色",
