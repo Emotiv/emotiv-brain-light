@@ -68,8 +68,6 @@ const I18N = {
     "setup.secret_saved": "A secret is already saved. Leave blank to keep it.",
     "setup.bulb": "Smart light",
     "setup.bulb_ip": "Light IP address",
-    "setup.bulb.hint":
-      "Enable LAN Control in the Xiaomi Home app first. The bulb and this computer must be on the same network.",
     "setup.profile": "Trained profile",
     "setup.profile.hint": "Mental Commands needs a profile trained in EMOTIV BCI.",
     "setup.profile.none": "— select a profile —",
@@ -102,7 +100,7 @@ const I18N = {
     "step.session": "Session",
     "step.profile": "Profile",
     "step.stream": "Data stream",
-    "step.bulb": "Bulb",
+    "step.bulb": "Light",
 
     "state.idle": "Idle",
     "state.pending": "Working…",
@@ -143,9 +141,9 @@ const I18N = {
     "status.profile_loaded": "Profile {profile} loaded",
     "status.streaming": "Receiving data",
     "status.reconnecting": "Connection lost — retrying…",
-    "status.discovering_bulb": "Scanning the network for bulbs…",
-    "status.bulb_found": "Bulb found at {ip}",
-    "status.connecting_bulb": "Connecting to the bulb at {ip}…",
+    "status.discovering_bulb": "Scanning the network for lights…",
+    "status.bulb_found": "Light found at {ip}",
+    "status.connecting_bulb": "Connecting to the light at {ip}…",
     "status.bulb_ready": "Light ready at {ip}",
 
     "err.no_credentials": "Enter your Cortex Client ID and secret in Setup.",
@@ -179,7 +177,7 @@ const I18N = {
     "err.profiles_failed": "Could not list profiles. {detail}",
     "err.actions_failed": "Could not read the profile's trained actions. {detail}",
     "err.mode_switch_failed": "Could not switch mode. {detail}",
-    "err.no_bulb_ip": "Set the bulb IP address in Setup, or scan the network.",
+    "err.no_bulb_ip": "Set the light's IP address in Setup, or scan the network.",
     "err.no_bulb_found":
       "No light found on this network. For Yeelight, check that LAN Control is enabled in the app.",
     "err.discover_failed": "Network scan failed: {detail}",
@@ -260,9 +258,7 @@ const I18N = {
     "setup.client_secret": "Client Secret",
     "setup.secret_saved": "已保存 Secret。留空则保持不变。",
     "setup.bulb": "智能灯具",
-    "setup.bulb_ip": "灯泡 IP 地址",
-    "setup.bulb.hint":
-      "请先在米家 App 中开启「局域网控制」。灯泡与本机需在同一网络。",
+    "setup.bulb_ip": "灯具 IP 地址",
     "setup.profile": "已训练的配置文件",
     "setup.profile.hint": "意念指令模式需要在 EMOTIV BCI 中训练过的配置文件。",
     "setup.profile.none": "— 请选择配置文件 —",
@@ -295,7 +291,7 @@ const I18N = {
     "step.session": "会话",
     "step.profile": "配置文件",
     "step.stream": "数据流",
-    "step.bulb": "灯泡",
+    "step.bulb": "灯具",
 
     "state.idle": "空闲",
     "state.pending": "处理中…",
@@ -336,9 +332,9 @@ const I18N = {
     "status.profile_loaded": "配置文件 {profile} 已加载",
     "status.streaming": "正在接收数据",
     "status.reconnecting": "连接中断 — 正在重试…",
-    "status.discovering_bulb": "正在扫描网络中的灯泡…",
-    "status.bulb_found": "在 {ip} 找到灯泡",
-    "status.connecting_bulb": "正在连接 {ip} 的灯泡…",
+    "status.discovering_bulb": "正在扫描网络中的灯具…",
+    "status.bulb_found": "在 {ip} 找到灯具",
+    "status.connecting_bulb": "正在连接 {ip} 的灯具…",
     "status.bulb_ready": "灯具就绪（{ip}）",
 
     "err.no_credentials": "请在「设置」中填写 Cortex Client ID 与 Secret。",
@@ -368,11 +364,11 @@ const I18N = {
     "err.profiles_failed": "无法获取配置文件列表。{detail}",
     "err.actions_failed": "无法读取配置文件中已训练的动作。{detail}",
     "err.mode_switch_failed": "无法切换模式。{detail}",
-    "err.no_bulb_ip": "请在「设置」中填写灯泡 IP，或扫描网络。",
+    "err.no_bulb_ip": "请在「设置」中填写灯具 IP，或扫描网络。",
     "err.no_bulb_found": "本网络中未找到灯具。若使用 Yeelight，请确认已开启「局域网控制」。",
     "err.discover_failed": "网络扫描失败：{detail}",
     "err.bulb_unreachable":
-      "无法连接 {ip} 的灯泡。请检查 IP、局域网控制是否开启，以及两台设备是否在同一网络。（{detail}）",
+      "无法连接 {ip} 的灯具。请检查 IP 以及两台设备是否在同一网络。若使用 Yeelight，还需开启「局域网控制」。（{detail}）",
     "err.bulb_music_busy":
       "灯泡拒绝进入音乐模式。很可能仍有另一个本应用实例在占用，请关闭后重试。",
 
