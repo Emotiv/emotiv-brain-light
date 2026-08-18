@@ -68,6 +68,8 @@ class CortexClient:
 
         self.met_cols: List[str] = []
         self.com_cols: List[str] = []
+        self.active_actions: List[str] = []
+        self.sensitivity: List[int] = []
         self.headsets: List[Dict[str, Any]] = []
         self.profiles: List[str] = []
 
@@ -501,9 +503,11 @@ class CortexClient:
             self._status(STEP_PROFILE, "error", "err.profile_untrained", profile=name)
             raise CortexError("err.profile_untrained", profile=name)
 
+        self.active_actions = list(actions)
         self.emit("actions", {"items": actions, "profile": name})
         self._status(STEP_PROFILE, "ok", "status.profile_loaded", profile=name)
 
+        await self._emit_sensitivity()
         await self._subscribe(["com"])
         return actions
 
@@ -576,6 +580,62 @@ class CortexClient:
         except CortexError as e:
             self._log("warn", "err.profile_unload_failed", profile=name,
                       detail=e.params.get("detail", ""))
+
+    # -------------------------------------------------------- sensitivity
+    # Cortex keeps one sensitivity per trainable action, 1 (least sensitive) to
+    # 10. The array is always four long and lines up with the active actions in
+    # order, ignoring `neutral` — verified on a profile with two trained
+    # actions, which read back [1, 1, 5, 5].
+    #
+    # `get` accepts either a profile or a session, but `set` only works with a
+    # session that has the profile loaded; passing a profile name returns
+    # -32007 "the session does not exist".
+
+    def trainable_actions(self) -> List[str]:
+        """Active actions minus neutral — the ones a slider maps onto."""
+        return [a for a in self.active_actions if a != "neutral"]
+
+    async def get_sensitivity(self) -> List[int]:
+        if not self.session_id:
+            raise CortexError("err.no_headset_selected")
+        res = await self._send(
+            "mentalCommandActionSensitivity",
+            {"cortexToken": self.token, "status": "get", "session": self.session_id},
+        )
+        return [int(v) for v in res] if isinstance(res, list) else []
+
+    async def set_sensitivity(self, values: List[int]) -> List[int]:
+        if not self.session_id:
+            raise CortexError("err.no_headset_selected")
+
+        # Cortex insists on exactly four values, so pad from what is already
+        # stored rather than inventing defaults for slots we do not show.
+        try:
+            current = await self.get_sensitivity()
+        except CortexError:
+            current = []
+        merged = list(current) + [5] * (4 - len(current))
+        for i, v in enumerate(values[:4]):
+            merged[i] = max(1, min(10, int(v)))
+
+        await self._send(
+            "mentalCommandActionSensitivity",
+            {"cortexToken": self.token, "status": "set", "session": self.session_id,
+             "values": merged[:4]},
+        )
+        self.sensitivity = merged[:4]
+        self.emit("sensitivity", {"values": self.sensitivity,
+                                  "actions": self.trainable_actions()})
+        return self.sensitivity
+
+    async def _emit_sensitivity(self) -> None:
+        try:
+            self.sensitivity = await self.get_sensitivity()
+        except CortexError as e:
+            self._log("warn", "err.sensitivity_failed", **e.params)
+            return
+        self.emit("sensitivity", {"values": self.sensitivity,
+                                  "actions": self.trainable_actions()})
 
     async def _active_actions(self, profile: str) -> List[str]:
         """Trained action order — this is what defines each slot colour."""

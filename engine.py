@@ -110,8 +110,11 @@ class Engine:
             bulb.connect(attempts=3)
         except LightError as e:
             # The transport already chose a translatable code, so the engine
-            # never has to recognise a vendor's error string.
-            self._status(STEP_BULB, "error", e.code, ip=ip, **e.params)
+            # never has to recognise a vendor's error string. Merge rather than
+            # pass ip= alongside **e.params: the transport already puts ip in
+            # there, and the duplicate raises TypeError instead of reporting the
+            # failure.
+            self._status(STEP_BULB, "error", e.code, **{"ip": ip, **e.params})
             return False
         except Exception as e:
             self._status(STEP_BULB, "error", "err.bulb_unreachable", ip=ip, detail=str(e))
@@ -195,6 +198,10 @@ class Engine:
 
     def select_profile(self, name: str) -> Dict[str, Any]:
         return self._run_step(self.cortex.select_profile(name), "err.profile_load_failed")
+
+    def set_sensitivity(self, values) -> Dict[str, Any]:
+        return self._run_step(self.cortex.set_sensitivity(list(values)),
+                              "err.sensitivity_failed", timeout=30.0)
 
     def set_mode(self, mode: str, profile: str = "") -> Dict[str, Any]:
         settings.set("mode", mode)

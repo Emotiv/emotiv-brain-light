@@ -31,10 +31,17 @@ class Api:
         self.window = None
         self.engine = Engine(self.push_event)
         self._lock = threading.Lock()
+        # Set once the window starts closing. See push_event for why.
+        self.closing = False
 
     # --------------------------------------------------------------- to the JS
     def push_event(self, event: str, data: Dict[str, Any]):
-        if not self.window:
+        if not self.window or self.closing:
+            # Never touch the webview while it is going away. pywebview runs the
+            # `closing` handler synchronously on the UI thread, and evaluate_js
+            # schedules work on that same thread and then blocks waiting for it.
+            # Emitting from the shutdown path deadlocks the app, which then only
+            # dies to a Force Quit.
             return
         payload = json.dumps({"event": event, "data": data}, ensure_ascii=False)
         try:
@@ -79,6 +86,9 @@ class Api:
     def select_profile(self, name: str):
         return self.engine.select_profile(name)
 
+    def set_sensitivity(self, values):
+        return self.engine.set_sensitivity(values)
+
     def discover_bulb(self):
         ip = self.engine.discover_bulb()
         if ip:
@@ -101,8 +111,11 @@ def main():
     api.window = window
 
     def on_closing():
-        # Without this the bulb keeps believing it is still in music mode.
+        # Order matters: silence the bridge first, then tear down. The teardown
+        # emits status events, and any of them would deadlock the UI thread.
+        api.closing = True
         try:
+            # Without this the light keeps believing it is still in music mode.
             api.engine.stop()
         except Exception:
             pass

@@ -238,6 +238,15 @@ main {
 #profile-block { margin-top: 2px; }
 
 .cmd-power { margin-bottom: 4px; }
+
+/* ─── Sensitivity sliders ────────────────────────────────────────────────── */
+#sensitivity-block { margin-top: 4px; }
+.sens-row { display: grid; grid-template-columns: 108px 1fr 28px; align-items: center; gap: 12px; margin-bottom: 9px; }
+.sens-name { display: flex; align-items: center; gap: 7px; font-size: 13px; min-width: 0; }
+.sens-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sens-row input[type="range"] { margin: 0; }
+.sens-value { font-family: var(--mono); font-size: 12px; text-align: right; color: var(--fg-dim); }
+.sens-row.busy { opacity: 0.5; }
 .cmd-power .bar-track { height: 9px; margin-top: 8px; }
 #cmd-power-value { font-family: var(--mono); }
 

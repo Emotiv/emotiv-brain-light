@@ -14,6 +14,7 @@ const state = {
   loadedProfile: "",
   actionColors: {},
   actionOrder: [],
+  sensitivity: [],
   steps: {},
   scores: {},
   leader: null,
@@ -36,6 +37,7 @@ function applyStaticI18n() {
   renderSteps();
   renderMetricBars();
   renderActionChips();
+  renderSensitivity();
   renderLeader();
   renderProfileOptions();
   renderHeadsets();
@@ -305,6 +307,80 @@ function renderActionChips() {
   }
 }
 
+// Cortex stores one sensitivity per trainable action, 1 to 10, aligned with the
+// action order and skipping neutral — the same order the slot colours follow.
+function renderSensitivity() {
+  const host = $("#sensitivity-list");
+  const block = $("#sensitivity-block");
+  host.innerHTML = "";
+
+  const actions = state.actionOrder;
+  block.classList.toggle("hidden", actions.length === 0);
+  if (!actions.length) return;
+
+  actions.forEach((action, i) => {
+    const colour = state.actionColors[action] || "#666";
+    const value = state.sensitivity[i] ?? 5;
+
+    const row = document.createElement("div");
+    row.className = "sens-row";
+    row.dataset.action = action;
+
+    const name = document.createElement("div");
+    name.className = "sens-name";
+    const sw = document.createElement("i");
+    sw.className = "swatch";
+    sw.style.background = colour;
+    const label = document.createElement("span");
+    label.textContent = tHas("action." + action) ? t("action." + action) : action;
+    name.appendChild(sw);
+    name.appendChild(label);
+
+    const slider = document.createElement("input");
+    slider.type = "range";
+    slider.min = "1";
+    slider.max = "10";
+    slider.step = "1";
+    slider.value = String(value);
+    slider.style.accentColor = colour;
+
+    const readout = document.createElement("div");
+    readout.className = "sens-value";
+    readout.textContent = String(value);
+
+    // Show the new number while dragging, but only talk to Cortex on release —
+    // a request per pixel would flood the session.
+    slider.addEventListener("input", () => (readout.textContent = slider.value));
+    slider.addEventListener("change", () => commitSensitivity(i, Number(slider.value), row));
+
+    row.appendChild(name);
+    row.appendChild(slider);
+    row.appendChild(readout);
+    host.appendChild(row);
+  });
+}
+
+async function commitSensitivity(index, value, row) {
+  if (!state.running) {
+    addLog("error", "err.not_running", {});
+    renderSensitivity();
+    return;
+  }
+  const next = state.actionOrder.map((_, i) => state.sensitivity[i] ?? 5);
+  next[index] = value;
+
+  row.classList.add("busy");
+  try {
+    const res = await window.pywebview.api.set_sensitivity(next);
+    if (res && res.ok === false) {
+      addLog("error", res.code, res.params || {});
+      renderSensitivity();
+    }
+  } finally {
+    row.classList.remove("busy");
+  }
+}
+
 function highlightAction(action) {
   $$("#action-chips .chip").forEach((chip) => {
     const on = chip.dataset.action === action;
@@ -452,7 +528,12 @@ window.pushEvent = function (event, data) {
       state.loadedProfile = data.profile || state.loadedProfile;
       renderActionChips();
       renderProfiles();
+      renderSensitivity();
       updateLiveEmpty();
+      break;
+    case "sensitivity":
+      state.sensitivity = data.values || [];
+      renderSensitivity();
       break;
     case "running":
       state.running = data.running;
@@ -462,6 +543,7 @@ window.pushEvent = function (event, data) {
       if (!data.running) {
         state.selectedHeadset = "";
         state.loadedProfile = "";
+        state.sensitivity = [];
         renderHeadsets();
         renderProfiles();
       }

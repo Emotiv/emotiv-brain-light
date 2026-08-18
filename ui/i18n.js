@@ -57,6 +57,7 @@ const I18N = {
     "err.profile_incompatible":
       "Profile {profile} was trained on a different headset model, so {headset} cannot load it. Pick another profile, or train a new one on this headset.",
     "err.not_running": "Press Start first.",
+    "err.sensitivity_failed": "Could not change the sensitivity. {detail}",
 
 
     "setup.title": "Setup",
@@ -89,6 +90,9 @@ const I18N = {
     "panel.log": "Event log",
     "panel.colour": "Current colour",
     "panel.actions": "Trained actions",
+    "panel.sensitivity": "Command sensitivity",
+    "panel.sensitivity.hint":
+      "Higher values make an action easier to trigger, at the cost of more false positives. Saved into the profile, so EMOTIV BCI sees the same values.",
     "panel.waiting": "Waiting for data…",
     "panel.leader": "Leading",
     "panel.power": "Detection strength",
@@ -248,6 +252,7 @@ const I18N = {
     "err.profile_incompatible":
       "配置文件 {profile} 是在其他型号的设备上训练的，{headset} 无法加载。请换一个配置文件，或在此设备上重新训练。",
     "err.not_running": "请先点击「开始」。",
+    "err.sensitivity_failed": "无法修改灵敏度。{detail}",
 
 
     "setup.title": "设置",
@@ -280,6 +285,9 @@ const I18N = {
     "panel.log": "事件日志",
     "panel.colour": "当前颜色",
     "panel.actions": "已训练的动作",
+    "panel.sensitivity": "指令灵敏度",
+    "panel.sensitivity.hint":
+      "数值越高越容易触发该动作，但误触发也会增多。设置会保存到配置文件中，EMOTIV BCI 中看到的是同一组数值。",
     "panel.waiting": "等待数据…",
     "panel.leader": "当前最强",
     "panel.power": "识别强度",
