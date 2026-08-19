@@ -357,6 +357,7 @@ input[type="range"] { width: 100%; accent-color: var(--live); margin-top: 4px; }
 #headmap { width: 148px; height: auto; }
 .q-big { font-size: 30px; font-weight: 600; letter-spacing: -0.5px; margin: 10px 0 4px; }
 .head-outline { fill: rgba(255,255,255,0.04); stroke: rgba(255,255,255,0.16); stroke-width: 1.4; }
+.head-nose { fill: none; stroke: rgba(255,255,255,0.16); stroke-width: 1.4; stroke-linejoin: round; }
 .sensor { stroke: rgba(0,0,0,0.45); stroke-width: 1; transition: fill 300ms; }
 .sensor-label { font-size: 7.5px; fill: var(--fg-dim); text-anchor: middle; font-family: var(--mono); }
 .sensor { cursor: help; }

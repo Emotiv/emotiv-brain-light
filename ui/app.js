@@ -559,13 +559,20 @@ function drawHeadmap(svg, grades, opts) {
   if (!svg) return;
   const { radius: r, cx, cy, dot, labels } = opts;
   const names = Object.keys(grades);
-  const nose = cy - r - (dot > 4 ? 8 : 3);
+
+  // One shape for the head, and the nose as an open chevron resting on it.
+  // Drawing the outline as an arc-with-nose path instead put the arc's
+  // endpoints off the circle, so SVG re-centred it on a circle of its own and
+  // the head came out doubled and visibly off.
+  const noseHalf = Math.PI / 18;                     // 10° either side of centre
+  const bx = r * Math.sin(noseHalf);
+  const by = r * Math.cos(noseHalf);
 
   let out =
-    '<path class="head-outline" d="M ' + cx + " " + nose + " L " + (cx + r * 0.13) + " " +
-      (cy - r + r * 0.19) + " A " + r + " " + r + " 0 1 1 " + (cx - r * 0.13) + " " +
-      (cy - r + r * 0.19) + ' Z" />' +
-    '<circle class="head-outline" cx="' + cx + '" cy="' + cy + '" r="' + r + '" />';
+    '<circle class="head-outline" cx="' + cx + '" cy="' + cy + '" r="' + r + '" />' +
+    '<path class="head-nose" d="M ' + (cx - bx) + " " + (cy - by) +
+      " L " + cx + " " + (cy - r - r * 0.15) +
+      " L " + (cx + bx) + " " + (cy - by) + '" />';
 
   names.forEach((name, i) => {
     let pos = SENSOR_POSITIONS[name];
@@ -583,7 +590,7 @@ function drawHeadmap(svg, grades, opts) {
     if (labels) out += "<title>" + escapeText(name + " — " + t("quality.grade." + grade)) + "</title>";
     out += "</circle>";
     if (labels) {
-      out += '<text class="sensor-label" x="' + x + '" y="' + (y + 15) + '">' +
+      out += '<text class="sensor-label" x="' + x + '" y="' + (y + dot + 8) + '">' +
         escapeText(name) + "</text>";
     }
   });
