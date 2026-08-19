@@ -89,6 +89,34 @@ class Api:
     def set_sensitivity(self, values):
         return self.engine.set_sensitivity(values)
 
+    # --------------------------------------------------------------- training
+    def create_profile(self, name: str):
+        return self.engine.create_profile(name)
+
+    def refresh_commands(self):
+        return self.engine.refresh_commands()
+
+    def set_active_actions(self, actions):
+        return self.engine.set_active_actions(actions or [])
+
+    def start_training(self, action: str):
+        return self.engine.start_training(action)
+
+    def accept_training(self):
+        return self.engine.accept_training()
+
+    def reject_training(self):
+        return self.engine.reject_training()
+
+    def erase_training(self, action: str):
+        return self.engine.erase_training(action)
+
+    def reset_training(self):
+        return self.engine.reset_training()
+
+    def training_result(self):
+        return self.engine.training_result()
+
     def discover_bulb(self):
         ip = self.engine.discover_bulb()
         if ip:

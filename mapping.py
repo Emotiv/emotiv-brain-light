@@ -7,6 +7,8 @@ Two modes:
   runner-up sets the saturation.
 - Mental Commands: the detected action picks the colour (slot colour, as in
   EmotivBCI) and the detection strength sets the brightness.
+- Training: the light stops reporting and starts instructing — see
+  TrainingLightMapper.
 """
 import math
 import time
@@ -16,6 +18,8 @@ from palette import (
     NEUTRAL_COLOR,
     PERFORMANCE_METRIC_COLORS,
     PERFORMANCE_METRIC_KEYS,
+    TRAINING_REST_COLOR,
+    blend_hsv,
     hex_to_hsv,
     slot_color,
 )
@@ -222,3 +226,69 @@ class MentalCommandMapper:
             color,
             {"power": round(power, 3), "actions": self.actions},
         )
+
+
+# Cortex records a mental command for eight seconds. It signals the start and
+# the end on the `sys` stream, so this is only the length the animation paces
+# itself against — the events remain what actually opens and closes the window.
+TRAINING_SECONDS = 8.0
+
+
+class TrainingLightMapper:
+    """During training the light instructs instead of reporting.
+
+    Neutral is the absence of a command, so it gets the absence of movement: a
+    still, cool blue — EMOTIV's own Relaxation colour — held at one unchanging,
+    low brightness for the whole window. Nothing to do, nothing to think.
+
+    Every other action starts from that same rest and crosses to the colour it
+    will have in live mode, brightening as it goes, so the ramp *is* the
+    instruction: begin calm, build the effort, hold it at the end. It also
+    teaches the mapping the user is about to live with — the colour a command
+    settles on while training is the colour the light shows when it fires.
+    """
+
+    def __init__(self, config):
+        self.config = config
+        self.colors: Dict[str, str] = {}
+
+    def set_colors(self, colors: Dict[str, str]):
+        """Share the slot colours the live mapper handed out."""
+        self.colors = dict(colors)
+
+    def _levels(self) -> Tuple[float, float]:
+        """Resting and peak brightness, inside the user's own limits."""
+        low = float(settings.get("bright_min"))
+        high = float(settings.get("bright_max"))
+        return low + 0.20 * (high - low), high
+
+    def frame(self, action: str, progress: float) -> Target:
+        """One frame of the window. `progress` runs 0 -> 1 across the eight seconds."""
+        progress = clamp(progress, 0.0, 1.0)
+        rest_bright, peak_bright = self._levels()
+
+        if action == "neutral":
+            # Held still on purpose: a light that moved would be asking for
+            # something, and neutral is the one recording that asks for nothing.
+            hue, sat, _ = hex_to_hsv(TRAINING_REST_COLOR)
+            return Target(hue, sat, rest_bright, action, TRAINING_REST_COLOR,
+                          {"training": True, "progress": round(progress, 3)})
+
+        target_color = self.colors.get(action) or slot_color(0)
+        # Smoothstep, so the crossing eases in and out instead of starting with
+        # a jerk the moment the window opens.
+        eased = progress * progress * (3.0 - 2.0 * progress)
+        hue, sat, _ = blend_hsv(TRAINING_REST_COLOR, target_color, eased)
+
+        return Target(
+            hue,
+            sat,
+            rest_bright + eased * (peak_bright - rest_bright),
+            action,
+            target_color,
+            {"training": True, "progress": round(progress, 3)},
+        )
+
+    def rest(self, action: str = "neutral") -> Target:
+        """The still frame to sit on before the window opens, and after it closes."""
+        return self.frame("neutral", 0.0) if action == "neutral" else self.frame(action, 0.0)

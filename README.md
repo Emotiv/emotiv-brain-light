@@ -10,7 +10,8 @@ Two modes:
   intensity sets the brightness, and its lead over the runner-up sets the
   saturation.
 - **Mental Commands (BCI)** — the action detected by a trained profile picks the
-  colour, and the detection strength sets the brightness.
+  colour, and the detection strength sets the brightness. Profiles can be
+  **trained in the app**, with the light itself as the training cue.
 
 ```bash
 .venv/bin/python app.py
@@ -59,22 +60,98 @@ Profiles with more than four trained actions continue through the rest of the
 EmotivPRO chart palette — that part is our choice, since the official app does
 not go that far.
 
+## What is on screen
+
+The interface folds down to what is still undecided. Once a headset and a
+profile are chosen, the **Device** card collapses to a single line and the
+selected headset moves into the header, next to a small head diagram of its
+sensors and one badge with the worst of the two quality percentages. Clicking
+either the badge or the card head opens it again. The trained-profile list
+collapses to the one that is loaded, with **Change** to see the rest.
+
+The **Training** panel folds the same way, and folds itself the moment a
+recording is kept — after training, the thing worth looking at is the light.
+Its summary line keeps the answer visible while it is closed.
+
+## Training
+
+Mental Commands can be trained here rather than in EMOTIV BCI, and the app
+follows that app's flow: one row per command showing how many recordings stand
+behind it, a switch, and buttons to train, retrain or erase. Up to four commands
+besides Neutral, which is the limit Cortex enforces.
+
+### The light is the instruction
+
+This is the part EMOTIV BCI has no equivalent for. During the eight seconds of a
+recording the light stops reporting and starts instructing:
+
+| Recording | What the light does |
+|---|---|
+| **Neutral** | Holds still on `#5ab0ee` — EMOTIV's own Relaxation blue — at one low, unchanging brightness. Nothing to do, nothing to think. |
+| **Any command** | Starts from that same rest and crosses to the command's own slot colour, brightening as it goes, eased so it neither jerks at the start nor overshoots at the end. |
+
+The ramp *is* the instruction: settle, build the effort, hold it. And because a
+command trains toward the colour it will have in live mode, the eight seconds
+also teach the mapping the user is about to live with. It can be switched off
+under **Settings → Tuning → Light follows the training**.
+
+Cortex opens and closes the window itself, on the `sys` stream. The animation
+and the on-screen countdown are paced between `MC_Started` and `MC_Succeeded`,
+so they can never disagree with what is actually being recorded.
+
+### Before recording
+
+Both quality streams are on screen before anything is recorded, because they
+answer different questions and a headset can pass one while failing the other:
+
+- **Contact quality** (`dev`) — is the electrode touching skin well enough to
+  read anything at all?
+- **EEG quality** (`eq`) — is what arrives actually brain signal, rather than
+  jaw, movement or mains hum?
+
+Each sensor is a dot on a head seen from above, coloured on EMOTIV's own 0-4
+grading and captioned with its 10-20 name. The positions come from a single
+10-20 table, so Insight, EPOC, EPOC X and MN8 all draw correctly. A line
+underneath says whether this is worth recording on. Poor signal is not blocked —
+it is named, because training on it teaches the profile the wrong thing.
+
+Both live beside the device they describe, in the Device card, with the same
+head repeated small in the header. There is deliberately **no percentage bar
+tracking the value**: a number that ticks over twice a second is movement, not
+information. The dots carry which electrode is bad, and one badge carries how
+good the whole thing is.
+
+### After recording
+
+A recording is scored against the profile's own threshold and **kept or
+discarded by the user**; discarding changes nothing. Once kept, the profile is
+saved and the result panel updates:
+
+- the **brain map** from `mentalCommandBrainMap` — Neutral pinned at the origin
+  and every other command at its distance from it. That distance is the whole
+  story: a command drawn on top of Neutral is one the detector cannot tell apart
+  from doing nothing.
+- **skill rating**, **threshold** and **last score**.
+
+Erase drops one command's recordings; **Reset all** empties the profile. New
+profiles are created from the same panel and start genuinely empty.
+
 ## Supported lights
 
 | Brand | Protocol | Update ceiling | Verified |
 |---|---|---|---|
 | Yeelight | JSON over TCP 55443, music mode | 25/s (ours) | on a YLDP06YL |
-| LIFX | LIFX LAN, binary over UDP 56700 | 20/s (protocol) | **not on hardware** |
+| LIFX | LIFX LAN, binary over UDP 56700 | 20/s (protocol) | yes |
 
 The brand is picked on first run and can be changed under Settings. Only
 `lights/` knows which brand is in play — the engine, the mapping and the UI
 work the same either way, and `LightError` carries a translation code so the
 engine never has to recognise a vendor's error string.
 
-The LIFX encoder is verified byte-for-byte against the worked example in the
+The LIFX encoder was verified byte-for-byte against the worked example in the
 protocol documentation (36-byte header, `size=49`, `proto=0x1400`, type 102 for
-SetColor) and exercised against a fake device that speaks the protocol back;
-hardware confirmation is still outstanding.
+SetColor), exercised against a fake device that speaks the protocol back, and
+has since been confirmed on real hardware.
 
 Two things differ in practice. LIFX needs no equivalent of music mode: its
 ceiling is 20 messages/second and one `SetColor` carries the whole HSBK, so a
@@ -86,8 +163,10 @@ so the light interpolates between our frames on its own.
 ```
 app.py            pywebview window + the API exposed to JS
  └─ engine.py     orchestrates Cortex + mapping + bulb, publishes events
-     ├─ cortex_client.py   Cortex WebSocket: handshake, profiles, met, com
-     ├─ mapping.py         data -> HSV target (one mapper per mode)
+     ├─ cortex_client.py   Cortex WebSocket: handshake, profiles, training,
+     │                     met, com, sys, dev, eq
+     ├─ mapping.py         data -> HSV target (one mapper per mode, plus the
+     │                     training animation)
      ├─ palette.py         official palettes + colour conversions
      └─ bulb_driver.py     brand-agnostic smoothing, easing and reconnect
          └─ lights/        one transport per brand (yeelight, lifx)
@@ -106,8 +185,9 @@ stream.
 ### Languages
 
 The backend **never** sends finished text: it sends a code
-(`err.bulb_unreachable`) plus parameters, and the UI translates. All 52 codes
-exist in English and Chinese in `ui/i18n.js`. Adding a language means adding one
+(`err.bulb_unreachable`) plus parameters, and the UI translates. Every code
+exists in English and Chinese in `ui/i18n.js`, and the two blocks are kept at
+identical key sets. Adding a language means adding one
 block to that file.
 
 The language picker appears on first run, and then lives in the header.
@@ -153,16 +233,18 @@ credentials, language, bulb IP, last headset and last profile.
 2. **Pick a headset** from the list. There is a **Refresh** button to rescan.
    The app connects the headset and opens the session. In Performance Metrics it
    starts running right here.
-3. **Mental Commands** — after the session the app lists the account's **trained
-   profiles**; pick one and it loads, reads the actions, and starts running.
+3. **Mental Commands** — after the session the app lists the account's
+   profiles; pick one and it loads, reads the actions, and starts running. Or
+   create one with **New profile** and train it here.
 
 The last headset and profile are remembered: on later runs the app reconnects to
 them on its own, and you only touch the lists to change something.
 
-Mental Commands needs a profile trained in EMOTIV BCI with at least one action
-besides Neutral, **and trained on the same headset model** — an EPOC X profile
-will not load on an Insight (Cortex returns `-32226`, and the app explains that
-on screen).
+Mental Commands needs a profile with at least one trained action besides
+Neutral, **trained on the same headset model** — an EPOC X profile will not load
+on an Insight (Cortex returns `-32226`, and the app explains that on screen). A
+profile with nothing trained is no longer a dead end: it loads, says what is
+missing, and the training panel is right there.
 
 ## Packaged builds
 
@@ -238,19 +320,12 @@ notarisation step to the workflow once those exist.
 | Brand | Protocol | Update ceiling | Verified |
 |---|---|---|---|
 | Yeelight | JSON over TCP 55443, music mode | 25/s (ours) | on a YLDP06YL |
-| LIFX | LIFX LAN, binary over UDP 56700 | 20/s (protocol) | **not on hardware** |
+| LIFX | LIFX LAN, binary over UDP 56700 | 20/s (protocol) | yes |
 
 The brand is picked on first run and can be changed under Settings. Only
 `lights/` knows which brand is in play — the engine, the mapping and the UI
 work the same either way, and `LightError` carries a translation code so the
 engine never has to recognise a vendor's error string.
-
-**The LIFX driver has never driven a real LIFX device.** It was written against
-the published protocol and its encoder is verified byte-for-byte against the
-worked example in the documentation (36-byte header, `size=49`, `proto=0x1400`,
-type 102 for SetColor), exercised against a fake device that speaks the
-protocol back. That is not the same as working. Treat the first run on real
-hardware as the test.
 
 Two things differ in practice. LIFX needs no equivalent of music mode: its
 ceiling is 20 messages/second and one `SetColor` carries the whole HSBK, so a
@@ -297,10 +372,6 @@ Always quit through the window or with `Ctrl+C` — both release music mode.
 **macOS firewall.** Music mode requires the bulb to open a connection *back* to
 this machine. If the firewall blocks inbound connections to Python,
 `start_music()` hangs. Allow the binary, or set `HOST_IP`.
-
-**Profile with no trained action.** In Mental Commands, a profile holding only
-Neutral leaves the bulb idle. The app detects that and says so instead of
-pretending it works.
 
 **Incompatible profile (`-32226`).** A profile trained on another headset model
 will not load — an EPOC X profile is no good on an Insight. The list shows every

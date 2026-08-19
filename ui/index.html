@@ -57,6 +57,11 @@
       </div>
     </div>
     <div class="topbar-right">
+      <button class="device-pill hidden" id="device-pill">
+        <svg id="pill-head" viewBox="0 0 44 48" aria-hidden="true"></svg>
+        <span class="device-name" id="pill-name"></span>
+        <span class="quality-badge" id="pill-quality">—</span>
+      </button>
       <span class="pill" id="running-pill"></span>
       <div class="lang-switch">
         <button data-lang="en" class="lang-chip">EN</button>
@@ -81,18 +86,42 @@
         </button>
       </div>
 
-      <section class="card" id="devices-card">
-        <div class="row-between">
+      <section class="card collapsible" id="devices-card">
+        <button class="card-head" data-collapse="devices-card">
+          <i class="chev"></i>
           <h2 data-i18n="panel.devices"></h2>
-          <button class="btn tiny ghost" id="btn-refresh-headsets" data-i18n="btn.refresh"></button>
-        </div>
-        <div class="picker" id="headset-list"></div>
-        <div class="empty muted" id="headset-empty" data-i18n="panel.no_headsets"></div>
+          <span class="card-summary" id="devices-summary"></span>
+        </button>
 
-        <div id="profile-block">
-          <div class="subhead muted" data-i18n="panel.profiles"></div>
-          <div class="picker" id="profile-list"></div>
-          <div class="empty muted" id="profile-empty" data-i18n="panel.connect_first"></div>
+        <div class="card-body">
+          <div class="row-between">
+            <div class="subhead muted" data-i18n="panel.headsets"></div>
+            <button class="btn tiny ghost" id="btn-refresh-headsets" data-i18n="btn.refresh"></button>
+          </div>
+          <div class="picker" id="headset-list"></div>
+          <div class="empty muted" id="headset-empty" data-i18n="panel.no_headsets"></div>
+
+          <!-- Sensor quality, beside the device it belongs to -->
+          <div class="quality hidden" id="quality-block">
+            <svg id="headmap" viewBox="0 0 160 176" aria-hidden="true"></svg>
+            <div class="quality-readout">
+              <div class="q-tabs">
+                <button class="q-tab active" data-quality="cq" data-i18n="quality.contact"></button>
+                <button class="q-tab" data-quality="eq" data-i18n="quality.eeg"></button>
+              </div>
+              <div class="q-big" id="q-big">—</div>
+              <p class="small" id="q-verdict"></p>
+            </div>
+          </div>
+
+          <div id="profile-block">
+            <div class="row-between">
+              <div class="subhead muted" data-i18n="panel.profiles"></div>
+              <button class="btn tiny ghost hidden" id="btn-change-profile" data-i18n="btn.change"></button>
+            </div>
+            <div class="picker" id="profile-list"></div>
+            <div class="empty muted" id="profile-empty" data-i18n="panel.connect_first"></div>
+          </div>
         </div>
       </section>
 
@@ -132,6 +161,40 @@
         </div>
         <div class="empty muted" id="live-empty" data-i18n="panel.waiting"></div>
       </section>
+
+      <!-- ─── Training ─────────────────────────────────────────────────── -->
+      <section class="card collapsible hidden" id="training-card">
+        <button class="card-head" data-collapse="training-card">
+          <i class="chev"></i>
+          <h2 data-i18n="panel.training"></h2>
+          <span class="card-summary" id="training-summary"></span>
+        </button>
+
+        <div class="card-body">
+          <div class="row-gap" style="justify-content:flex-end">
+            <button class="btn tiny ghost" id="btn-new-profile" data-i18n="btn.new_profile"></button>
+            <button class="btn tiny ghost danger" id="btn-reset-all" data-i18n="btn.reset_all"></button>
+          </div>
+
+        <div class="subhead muted" data-i18n="panel.commands"></div>
+        <div id="command-list"></div>
+        <div class="add-command">
+          <select id="in-add-command"></select>
+          <button class="btn tiny" id="btn-add-command" data-i18n="btn.add_command"></button>
+        </div>
+        <p class="muted small" id="add-command-hint"></p>
+
+        <div class="subhead muted" data-i18n="panel.brainmap"></div>
+        <div class="brainmap-wrap">
+          <svg id="brainmap" viewBox="0 0 280 168" aria-hidden="true"></svg>
+          <div class="brainmap-side">
+            <div id="brainmap-legend"></div>
+            <div id="training-stats"></div>
+          </div>
+        </div>
+        <p class="muted small" data-i18n="panel.brainmap.hint"></p>
+        </div>
+      </section>
     </div>
 
     <!-- Right column -->
@@ -154,6 +217,50 @@
   <footer class="bottombar">
     <button class="btn primary big" id="btn-run"></button>
   </footer>
+</div>
+
+<!-- ─── Training window ───────────────────────────────────────────────────── -->
+<div id="training-overlay" class="overlay hidden">
+  <div class="train-card">
+    <div class="train-action">
+      <i class="swatch" id="train-swatch"></i>
+      <span id="train-action-name"></span>
+    </div>
+
+    <div class="train-ring">
+      <svg viewBox="0 0 120 120">
+        <circle class="ring-bg" cx="60" cy="60" r="52" />
+        <circle class="ring-fill" id="train-ring-fill" cx="60" cy="60" r="52" />
+      </svg>
+      <div class="train-count" id="train-count">8</div>
+    </div>
+
+    <div class="train-phase" id="train-phase"></div>
+    <p class="train-instr" id="train-instruction"></p>
+
+    <div class="train-score hidden" id="train-score">
+      <div class="row-between">
+        <span class="muted" data-i18n="train.score"></span>
+        <b id="train-score-value">—</b>
+      </div>
+      <div class="bar-track"><div class="bar-fill" id="train-score-bar"></div></div>
+    </div>
+
+    <div class="train-buttons" id="train-buttons"></div>
+  </div>
+</div>
+
+<!-- ─── New profile ───────────────────────────────────────────────────────── -->
+<div id="profile-overlay" class="overlay hidden">
+  <div class="welcome-card" style="text-align:left">
+    <h1 data-i18n="profile.new.title"></h1>
+    <p class="muted small" data-i18n="profile.new.hint"></p>
+    <input type="text" id="in-new-profile" spellcheck="false" autocomplete="off" />
+    <div class="row-gap" style="margin-top:16px;justify-content:flex-end">
+      <button class="btn ghost" id="btn-cancel-profile" data-i18n="btn.cancel"></button>
+      <button class="btn primary" id="btn-create-profile" data-i18n="btn.create"></button>
+    </div>
+  </div>
 </div>
 
 <!-- ─── Settings ──────────────────────────────────────────────────────────── -->
@@ -216,6 +323,12 @@
 
         <label><span data-i18n="tuning.bright_max"></span> <b id="lbl-bmax"></b></label>
         <input type="range" id="in-bright-max" min="20" max="100" step="1" />
+
+        <label class="check">
+          <input type="checkbox" id="in-training-feedback" />
+          <span data-i18n="tuning.training_feedback"></span>
+        </label>
+        <p class="muted small" data-i18n="tuning.training_feedback.hint"></p>
       </section>
     </div>
 

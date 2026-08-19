@@ -22,6 +22,9 @@ DEFAULTS: Dict[str, Any] = {
     "mode": "metrics",       # "metrics" | "commands"
     "profile": "",           # trained profile, used in commands mode
     "score_mode": "adaptive",
+    # Whether the light animates the training window. Off leaves it on the
+    # live colour while a recording runs.
+    "training_light_feedback": True,
     "smooth_tau": 0.45,
     "bright_min": 12.0,
     "bright_max": 100.0,

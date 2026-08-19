@@ -44,6 +44,12 @@ MENTAL_COMMAND_SLOT_COLORS: List[str] = [
 
 NEUTRAL_COLOR = "#ff0066"
 
+# Where the light rests while a training session is asking for *nothing*: the
+# official Relaxation blue. Training a command starts from this same rest and
+# crosses to that command's slot colour, so the light itself carries the
+# instruction — settle here, then build the effort.
+TRAINING_REST_COLOR = "#5ab0ee"
+
 # The metrics the app actually uses, in display order. This list is the single
 # gate: a metric absent from here is neither shown nor allowed to pick a colour.
 # The colour table above deliberately keeps every official entry, so re-enabling
@@ -70,3 +76,16 @@ def hsv_to_hex(hue: float, sat: float, value: float) -> str:
 
 def slot_color(index: int) -> str:
     return MENTAL_COMMAND_SLOT_COLORS[index % len(MENTAL_COMMAND_SLOT_COLORS)]
+
+
+def blend_hsv(from_hex: str, to_hex: str, t: float) -> Tuple[float, float, float]:
+    """Interpolate two colours in HSV, taking the short way round the circle.
+
+    Blending in RGB would drag a cyan-to-blue crossfade through a washed-out
+    grey; in HSV the light keeps its colour the whole way across.
+    """
+    t = 0.0 if t < 0.0 else 1.0 if t > 1.0 else t
+    h1, s1, v1 = hex_to_hsv(from_hex)
+    h2, s2, v2 = hex_to_hsv(to_hex)
+    delta = (h2 - h1 + 540.0) % 360.0 - 180.0
+    return (h1 + delta * t) % 360.0, s1 + (s2 - s1) * t, v1 + (v2 - v1) * t

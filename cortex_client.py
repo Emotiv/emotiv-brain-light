@@ -25,6 +25,33 @@ from settings import settings
 # the same key rather than being treated as a separate metric.
 METRIC_ALIASES = {"foc": "attention"}
 
+# Every mental command Cortex knows, in the order `getDetectionInfo` returns
+# them. Queried at runtime; this is the fallback for when that call fails.
+MENTAL_COMMAND_ACTIONS = [
+    "neutral", "push", "pull", "lift", "drop", "left", "right",
+    "rotateLeft", "rotateRight", "rotateClockwise", "rotateCounterClockwise",
+    "rotateForwards", "rotateReverse", "disappear",
+]
+
+# Cortex accepts at most four commands besides neutral in the active set —
+# the same four slots EmotivBCI draws.
+MAX_ACTIVE_ACTIONS = 4
+
+# What each mode needs on the wire. `dev` and `eq` ride along in both: sensor
+# quality is the first thing to check when anything looks wrong, and it costs
+# two samples a second.
+METRIC_STREAMS = ["met", "dev", "eq"]
+COMMAND_STREAMS = ["com", "sys", "dev", "eq"]
+
+# Losing these costs the quality panel, not the session.
+OPTIONAL_STREAMS = {"dev", "eq"}
+
+# Contact quality is graded 0-4 per sensor, but the last entry of the `dev`
+# array is an overall *percentage* under the name OVERALL. Verified live on an
+# Insight 2: cols ["Battery","Signal",["AF3",...,"OVERALL"],"BatteryPercent"],
+# sample [3, 1.0, [4,4,4,4,4,100], 80].
+CQ_OVERALL_KEY = "OVERALL"
+
 # Steps the UI draws as a status pipeline.
 STEP_CREDENTIALS = "credentials"
 STEP_CORTEX = "cortex"
@@ -42,7 +69,6 @@ FATAL_CODES = {
     "err.bad_credentials",
     "err.no_profile_selected",
     "err.profile_not_found",
-    "err.profile_untrained",
 }
 
 
@@ -66,9 +92,14 @@ class CortexClient:
         self.headset_id: Optional[str] = None
         self.loaded_profile: Optional[str] = None
 
-        self.met_cols: List[str] = []
-        self.com_cols: List[str] = []
+        # Column names per subscribed stream, as Cortex described them.
+        self.cols: Dict[str, List[Any]] = {}
         self.active_actions: List[str] = []
+        # action -> how many accepted trainings sit in the signature.
+        self.trained_actions: Dict[str, int] = {}
+        self.available_actions: List[str] = list(MENTAL_COMMAND_ACTIONS)
+        self.training_action: Optional[str] = None
+        self.quality: Dict[str, Any] = {}
         self.sensitivity: List[int] = []
         self.headsets: List[Dict[str, Any]] = []
         self.profiles: List[str] = []
@@ -88,6 +119,7 @@ class CortexClient:
         # Data callbacks, wired up by the engine.
         self.on_metrics: Optional[Callable[[Dict[str, float], Dict[str, bool]], None]] = None
         self.on_command: Optional[Callable[[str, float], None]] = None
+        self.on_training_event: Optional[Callable[[str, str], None]] = None
 
     # ---------------------------------------------------------------- helpers
     def _status(self, step: str, state: str, code: str = "", **params):
@@ -170,6 +202,7 @@ class CortexClient:
                 try:
                     await self._request_access()
                     await self._authorize()
+                    await self.load_available_actions()
                     await self._load_profiles()
                     await self.refresh_headsets(force=False)
 
@@ -252,8 +285,12 @@ class CortexClient:
                 self._handle_met(data["met"])
             elif "com" in data:
                 self._handle_com(data["com"])
+            elif "dev" in data:
+                self._handle_dev(data["dev"])
+            elif "eq" in data:
+                self._handle_eq(data["eq"])
             elif "sys" in data:
-                self._log("info", "log.sys_event", detail=str(data["sys"]))
+                self._handle_sys(data["sys"])
 
         except Exception as e:
             self._log("warn", "err.parse", detail=str(e))
@@ -371,7 +408,7 @@ class CortexClient:
         """After the session: metrics can run already; BCI needs a profile first."""
         if self.mode == "metrics":
             self._status(STEP_PROFILE, "idle")
-            await self._subscribe(["met"])
+            await self._subscribe(METRIC_STREAMS)
             return
 
         remembered = self.desired_profile or settings.get("profile")
@@ -497,18 +534,22 @@ class CortexClient:
         self.loaded_profile = name
 
         actions = await self._active_actions(name)
-        if not actions or actions == ["neutral"]:
-            # The profile exists but has no trained action beyond neutral: the
-            # bulb would just sit there, so say so instead of pretending.
-            self._status(STEP_PROFILE, "error", "err.profile_untrained", profile=name)
-            raise CortexError("err.profile_untrained", profile=name)
-
         self.active_actions = list(actions)
         self.emit("actions", {"items": actions, "profile": name})
-        self._status(STEP_PROFILE, "ok", "status.profile_loaded", profile=name)
+
+        if not actions or actions == ["neutral"]:
+            # Not a failure any more. This is exactly the state a profile the
+            # user just created is in, and the way out is the training panel,
+            # not a different profile — so load it, say what is missing, and
+            # leave the session up for training to use.
+            self._status(STEP_PROFILE, "ok", "status.profile_untrained", profile=name)
+            self._log("warn", "log.profile_untrained", profile=name)
+        else:
+            self._status(STEP_PROFILE, "ok", "status.profile_loaded", profile=name)
 
         await self._emit_sensitivity()
-        await self._subscribe(["com"])
+        await self.refresh_commands()
+        await self._subscribe(COMMAND_STREAMS)
         return actions
 
     def _fail_profile(self, name: str, error: CortexError):
@@ -580,6 +621,335 @@ class CortexClient:
         except CortexError as e:
             self._log("warn", "err.profile_unload_failed", profile=name,
                       detail=e.params.get("detail", ""))
+
+    # ------------------------------------------------------ command roster
+    # EmotivBCI shows one row per command: its name, how many accepted
+    # trainings sit behind it, and whether it is switched on. Three calls
+    # supply that. `mentalCommandActiveAction` is the enabled set and the
+    # order the slot colours follow; `getTrainedSignatureActions` is the
+    # training count; `getDetectionInfo` is everything that could be added.
+
+    async def load_available_actions(self):
+        """Ask Cortex which commands exist, once per connection."""
+        try:
+            info = await self._send("getDetectionInfo", {"detection": "mentalCommand"})
+            actions = info.get("actions") if isinstance(info, dict) else None
+            if actions:
+                self.available_actions = [a for a in actions if isinstance(a, str)]
+        except CortexError as e:
+            self._log("warn", "err.detection_info_failed", **e.params)
+
+    async def get_trained_actions(self) -> Dict[str, int]:
+        """action -> accepted trainings currently in the signature."""
+        if not self.loaded_profile:
+            return {}
+        try:
+            res = await self._send(
+                "getTrainedSignatureActions",
+                {"cortexToken": self.token, "detection": "mentalCommand", **self._scope()},
+            )
+        except CortexError as e:
+            self._log("warn", "err.trained_actions_failed", **e.params)
+            return {}
+        entries = (res or {}).get("trainedActions", []) if isinstance(res, dict) else []
+        return {
+            e.get("action"): int(e.get("times", 0))
+            for e in entries
+            if isinstance(e, dict) and e.get("action")
+        }
+
+    async def refresh_commands(self):
+        """Rebuild and publish the command roster."""
+        if not self.loaded_profile:
+            return
+        self.active_actions = await self._active_actions(self.loaded_profile)
+        self.trained_actions = await self.get_trained_actions()
+
+        # A command that was trained and then switched off still belongs on
+        # screen — with its training intact and its toggle down. Dropping it
+        # would look like the training was lost.
+        enabled = [a for a in self.active_actions if a != "neutral"]
+        disabled = [a for a in self.trained_actions if a != "neutral" and a not in enabled]
+
+        self.emit("commands", {
+            "profile": self.loaded_profile,
+            "enabled": enabled,
+            "disabled": disabled,
+            "trained": self.trained_actions,
+            "available": [a for a in self.available_actions if a != "neutral"],
+            "max_active": MAX_ACTIVE_ACTIONS,
+        })
+        # The slot colours follow the enabled order, so the rest of the app
+        # has to hear about a reorder too.
+        self.emit("actions", {"items": self.active_actions, "profile": self.loaded_profile})
+
+    async def set_active_actions(self, actions: List[str]) -> List[str]:
+        """Switch commands on or off, and persist it into the profile.
+
+        The list Cortex is *set* with excludes neutral (a `get` puts it back at
+        the front). Confirmed in EmotivBCI's own log: removing the only trained
+        command sets `actions: []`, and the following `get` returns
+        `["neutral"]`.
+        """
+        self._require_session()
+        wanted = [a for a in actions if a != "neutral"][:MAX_ACTIVE_ACTIONS]
+        await self._send(
+            "mentalCommandActiveAction",
+            {"cortexToken": self.token, "status": "set",
+             "session": self.session_id, "actions": wanted},
+        )
+        await self.save_profile()
+        await self.refresh_commands()
+        return wanted
+
+    # ------------------------------------------------------------- profiles
+    async def create_profile(self, name: str) -> str:
+        """Make a new, empty profile and load it, ready to be trained."""
+        name = (name or "").strip()
+        if not name:
+            raise CortexError("err.profile_name_empty")
+        if name in self.profiles:
+            raise CortexError("err.profile_exists", profile=name)
+        if not self.headset_id or not self.session_id:
+            raise CortexError("err.no_headset_selected")
+
+        self._status(STEP_PROFILE, "pending", "status.creating_profile", profile=name)
+        # Cortex builds the new profile out of whatever detection state is
+        # loaded on the headset, so creating one while another profile sits
+        # there hands the "empty" profile that profile's training. Unload
+        # first and the new profile really does start at zero — verified: it
+        # comes back with active ["neutral"] and no trained actions.
+        await self._unload_current_profile()
+        # `headset` is required here, whatever the docs say: creating without
+        # it answers -32602 Invalid Parameters on Cortex 4.8. Deleting, by
+        # contrast, does not want it.
+        await self._send(
+            "setupProfile",
+            {"cortexToken": self.token, "headset": self.headset_id,
+             "profile": name, "status": "create"},
+            timeout=45.0,
+        )
+        await self._load_profiles()
+        await self.select_profile(name)
+        return name
+
+    async def save_profile(self):
+        """Persist the loaded profile. Training is only kept once this runs."""
+        if not self.loaded_profile or not self.headset_id:
+            return
+        try:
+            await self._send(
+                "setupProfile",
+                {"cortexToken": self.token, "headset": self.headset_id,
+                 "profile": self.loaded_profile, "status": "save"},
+                timeout=45.0,
+            )
+        except CortexError as e:
+            self._log("error", "err.profile_save_failed",
+                      profile=self.loaded_profile, **e.params)
+            raise
+
+    # ------------------------------------------------------------- training
+    # The whole cycle, as EmotivBCI runs it and as the logs confirm:
+    #
+    #   training status=start   -> sys MC_Started -> eight seconds of EEG
+    #                           -> sys MC_Succeeded (or MC_Failed)
+    #   training status=accept  -> sys MC_Completed -> setupProfile save
+    #   training status=reject  -> sys MC_Rejected, nothing changes
+    #
+    # Nothing is written to the profile until accept *and* save. A rejected or
+    # failed recording leaves the signature exactly as it was.
+
+    def _scope(self) -> Dict[str, Any]:
+        """How to address the loaded detection state.
+
+        Every read-back below accepts either a session or a profile name, and
+        after a training completes they agree — but only the session is
+        guaranteed to be the state Cortex is actually running. Prefer it, and
+        fall back to the name when there is no session to point at.
+        """
+        if self.session_id:
+            return {"session": self.session_id}
+        return {"profile": self.loaded_profile}
+
+    def _require_session(self):
+        if not self.session_id or not self.token:
+            raise CortexError("err.no_headset_selected")
+        if not self.loaded_profile:
+            raise CortexError("err.no_profile_selected")
+
+    async def _training(self, status: str, action: str = "") -> Dict[str, Any]:
+        self._require_session()
+        params = {
+            "cortexToken": self.token,
+            "session": self.session_id,
+            "detection": "mentalCommand",
+            "status": status,
+        }
+        if action:
+            params["action"] = action
+        return await self._send("training", params, timeout=45.0)
+
+    async def start_training(self, action: str) -> Dict[str, Any]:
+        if action not in self.available_actions:
+            raise CortexError("err.unknown_action", action=action)
+
+        # Cortex will not record a command that is not in the active set, so
+        # switching it on is part of starting, not a separate step the user
+        # has to remember.
+        if action != "neutral" and action not in self.active_actions:
+            enabled = [a for a in self.active_actions if a != "neutral"]
+            if len(enabled) >= MAX_ACTIVE_ACTIONS:
+                raise CortexError("err.too_many_actions", max=MAX_ACTIVE_ACTIONS)
+            await self.set_active_actions(enabled + [action])
+
+        self.training_action = action
+        try:
+            return await self._training("start", action)
+        except CortexError:
+            self.training_action = None
+            raise
+
+    async def accept_training(self) -> Dict[str, Any]:
+        """Keep the recording.
+
+        Saving and re-reading deliberately do *not* happen here. Cortex
+        rebuilds the signature after this call returns and announces it with
+        MC_Completed; anything read before that event reports the state from
+        before the recording — which is how the training counts ended up
+        permanently one step behind. `_after_accept` picks it up there.
+        """
+        return await self._training("accept", self.training_action or "")
+
+    async def reject_training(self) -> Dict[str, Any]:
+        action = self.training_action or ""
+        res = await self._training("reject", action)
+        self.training_action = None
+        return res
+
+    async def erase_training(self, action: str) -> Dict[str, Any]:
+        """Throw away everything recorded for one command.
+
+        EmotivBCI does the same on its bin icon: erase, drop the command from
+        the active set, save. Erasing without the second step would leave a
+        command listed, enabled and holding nothing.
+        """
+        res = await self._training("erase", action)
+        if action != "neutral":
+            await self.set_active_actions(
+                [a for a in self.active_actions if a not in ("neutral", action)]
+            )
+        else:
+            await self.save_profile()
+            await self.refresh_commands()
+        await self.emit_training_result()
+        return res
+
+    async def reset_training(self) -> Dict[str, Any]:
+        """Wipe the whole signature — every command, back to an empty profile.
+
+        Cortex has no whole-signature reset. `training status=reset` is
+        per-action and refuses without one ("This parameter is required:
+        action"), so the way to empty a profile is to erase each command that
+        holds anything and then save once.
+        """
+        self.training_action = None
+        trained = await self.get_trained_actions()
+        for action in list(trained):
+            try:
+                await self._training("erase", action)
+            except CortexError as e:
+                self._log("warn", "err.training_failed", **e.params)
+        # Emptying the active set saves the profile and republishes the roster.
+        await self.set_active_actions([])
+        await self.emit_training_result()
+        return {"status": "reset", "actions": list(trained)}
+
+    async def _after_accept(self):
+        """The signature is rebuilt: persist it and re-read what it now holds."""
+        self.training_action = None
+        try:
+            await self.save_profile()
+        except CortexError:
+            return  # save_profile already logged and told the UI
+        await self._resync()
+
+    async def _resync(self):
+        """Re-read the roster and the result after Cortex rebuilds a signature."""
+        try:
+            await self.refresh_commands()
+            await self.emit_training_result()
+        except CortexError as e:
+            self._log("warn", "err.commands_failed", **e.params)
+
+    async def _emit_training_score(self, action: str):
+        """Score of the recording that just finished, before it is kept."""
+        try:
+            res = await self._send(
+                "mentalCommandTrainingThreshold",
+                {"cortexToken": self.token, "session": self.session_id},
+            )
+        except CortexError as e:
+            self._log("warn", "err.threshold_failed", **e.params)
+            return
+        if not isinstance(res, dict):
+            return
+        self.emit("training_score", {
+            "action": action,
+            "score": res.get("lastTrainingScore"),
+            "threshold": res.get("currentThreshold"),
+        })
+
+    # --------------------------------------------------------- training result
+    async def emit_training_result(self):
+        """Publish what the profile now knows: brain map, threshold, skill.
+
+        `mentalCommandBrainMap` gives one point per command — neutral pinned at
+        the origin, every other command at its distance from it. That distance
+        is the whole story: a command sitting on top of neutral is one the
+        detector cannot tell apart from doing nothing.
+        """
+        if not self.loaded_profile:
+            return
+        result: Dict[str, Any] = {"profile": self.loaded_profile}
+
+        try:
+            brain_map = await self._send(
+                "mentalCommandBrainMap",
+                {"cortexToken": self.token, **self._scope()},
+            )
+            result["brain_map"] = [
+                {"action": e.get("action"), "coordinates": e.get("coordinates")}
+                for e in brain_map or []
+                if isinstance(e, dict) and isinstance(e.get("coordinates"), list)
+            ]
+        except CortexError as e:
+            self._log("warn", "err.brain_map_failed", **e.params)
+            result["brain_map"] = []
+
+        try:
+            threshold = await self._send(
+                "mentalCommandTrainingThreshold",
+                {"cortexToken": self.token, **self._scope()},
+            )
+            if isinstance(threshold, dict):
+                result["threshold"] = threshold.get("currentThreshold")
+                result["last_score"] = threshold.get("lastTrainingScore")
+        except CortexError as e:
+            self._log("warn", "err.threshold_failed", **e.params)
+
+        try:
+            skill = await self._send(
+                "mentalCommandGetSkillRating",
+                {"cortexToken": self.token, **self._scope()},
+            )
+            if isinstance(skill, (int, float)):
+                result["skill"] = float(skill)
+        except CortexError as e:
+            self._log("warn", "err.skill_failed", **e.params)
+
+        result["trained"] = self.trained_actions
+        self.emit("training_result", result)
 
     # -------------------------------------------------------- sensitivity
     # Cortex keeps one sensitivity per trainable action, 1 (least sensitive) to
@@ -659,23 +1029,26 @@ class CortexClient:
         )
 
         for ok in res.get("success", []):
-            if ok.get("streamName") == "met":
-                self.met_cols = ok.get("cols", [])
-            elif ok.get("streamName") == "com":
-                self.com_cols = ok.get("cols", [])
+            self.cols[ok.get("streamName")] = ok.get("cols", [])
 
-        failures = res.get("failure", [])
-        if failures:
-            fail = failures[0]
+        # `dev` and `eq` are a convenience — they drive the sensor-quality panel.
+        # A headset or firmware that does not offer them must not take the whole
+        # session down with it, which is what refusing every failure would do.
+        for fail in res.get("failure", []):
+            stream = fail.get("streamName")
+            if stream in OPTIONAL_STREAMS:
+                self._log("warn", "err.quality_unavailable",
+                          stream=stream, detail=fail.get("message", ""))
+                continue
             self._status(STEP_STREAM, "error", "err.subscribe_failed",
-                         stream=fail.get("streamName"), detail=fail.get("message", ""))
+                         stream=stream, detail=fail.get("message", ""))
             raise CortexError("err.subscribe_failed",
-                              stream=fail.get("streamName"), detail=fail.get("message", ""))
+                              stream=stream, detail=fail.get("message", ""))
 
         self._status(STEP_STREAM, "ok", "status.streaming", mode=self.mode)
 
     async def _unsubscribe_all(self):
-        streams = [s for s in (["met"] if self.met_cols else []) + (["com"] if self.com_cols else [])]
+        streams = list(self.cols)
         if not streams or not self.session_id:
             return
         try:
@@ -685,8 +1058,7 @@ class CortexClient:
             )
         except Exception:
             pass
-        self.met_cols = []
-        self.com_cols = []
+        self.cols.clear()
 
     async def switch_mode(self, mode: str, profile: str = ""):
         """Switch mode without tearing down the session."""
@@ -701,13 +1073,14 @@ class CortexClient:
 
     # ------------------------------------------------------------------ data
     def _handle_met(self, raw: List[Any]):
-        if not self.met_cols or not raw:
+        met_cols = self.cols.get("met") or []
+        if not met_cols or not raw:
             return
 
         values: Dict[str, float] = {}
         active: Dict[str, bool] = {}
 
-        for col, val in zip(self.met_cols, raw):
+        for col, val in zip(met_cols, raw):
             if col.endswith(".isActive"):
                 base = col[: -len(".isActive")]
                 active[METRIC_ALIASES.get(base, base)] = bool(val)
@@ -720,6 +1093,90 @@ class CortexClient:
 
         if self.on_metrics:
             self.on_metrics(values, active)
+
+    # ------------------------------------------------------------- quality
+    # Two streams describe the sensors, and they answer different questions.
+    # `dev` is contact quality: is the electrode touching skin well enough to
+    # read anything. `eq` is EEG quality: is what arrives actually brain
+    # signal rather than muscle, movement or mains hum. A headset can sit at a
+    # perfect contact score and still deliver unusable EEG, which is why the
+    # training screen shows both before it lets anyone record.
+
+    def _handle_dev(self, raw: List[Any]):
+        cols = self.cols.get("dev") or []
+        # cols look like ["Battery", "Signal", [<sensor names>, "OVERALL"],
+        # "BatteryPercent"] — the sensor names arrive nested inside the header.
+        names_at = next((i for i, c in enumerate(cols) if isinstance(c, list)), None)
+        if names_at is None or len(raw) <= names_at:
+            return
+        names = cols[names_at]
+        values = raw[names_at] or []
+
+        contact: Dict[str, int] = {}
+        overall = None
+        for name, value in zip(names, values):
+            if name == CQ_OVERALL_KEY:
+                overall = float(value)      # a percentage, unlike the rest
+            elif isinstance(value, (int, float)):
+                contact[name] = int(value)  # 0 (nothing) to 4 (good)
+
+        self.quality.update({"cq": contact, "cq_overall": overall})
+        for key, index in (("battery", 0), ("signal", 1), ("battery_percent", 3)):
+            if index < len(raw) and not isinstance(raw[index], list):
+                self.quality[key] = raw[index]
+        self._emit_quality()
+
+    def _handle_eq(self, raw: List[Any]):
+        cols = self.cols.get("eq") or []
+        # ["batteryPercent", "overall", "sampleRateQuality", <sensor names>]
+        if not cols or len(raw) < 3:
+            return
+        by_name = dict(zip(cols, raw))
+        self.quality.update({
+            # `overall` is already a percentage (92 on a headset reading 4/4/4/4/3),
+            # while the per-sensor entries share the 0-4 grading `dev` uses.
+            "eq_overall": float(by_name.get("overall", 0) or 0),
+            "sample_rate_quality": float(by_name.get("sampleRateQuality", 0) or 0),
+            "eq": {
+                name: int(value)
+                for name, value in list(by_name.items())[3:]
+                if isinstance(value, (int, float))
+            },
+        })
+        self._emit_quality()
+
+    def _emit_quality(self):
+        self.emit("quality", dict(self.quality))
+
+    # ------------------------------------------------------------- training
+    def _handle_sys(self, raw: List[Any]):
+        """Training events. `sys` carries [detection, event]."""
+        if not isinstance(raw, list) or len(raw) < 2:
+            return
+        detection, event = str(raw[0]), str(raw[1])
+        if detection != "mentalCommand":
+            self._log("info", "log.sys_event", detail=str(raw))
+            return
+
+        action = self.training_action or ""
+        self.emit("training", {"event": event, "action": action})
+
+        if event == "MC_Completed":
+            asyncio.create_task(self._after_accept())
+        elif event in ("MC_SignatureUpdated", "MC_DataErased"):
+            asyncio.create_task(self._resync())
+
+        if event == "MC_Succeeded":
+            # EmotivBCI asks for the threshold the moment a recording lands,
+            # and shows the score before offering accept or discard. Do the
+            # same: deciding without it is guessing.
+            asyncio.create_task(self._emit_training_score(action))
+
+        if self.on_training_event:
+            # The light animation hangs off MC_Started rather than off the
+            # request returning: `start` only means Cortex accepted the setup,
+            # and the eight seconds it records are counted from this event.
+            self.on_training_event(event, action)
 
     def _handle_com(self, raw: List[Any]):
         """`com` arrives as [action, power]."""

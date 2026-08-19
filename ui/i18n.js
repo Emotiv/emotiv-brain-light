@@ -36,7 +36,11 @@ const I18N = {
     "btn.close": "Close",
     "btn.refresh": "Refresh",
 
-    "panel.devices": "Headset",
+    "panel.devices": "Device",
+    "panel.headsets": "Headset",
+    "btn.change": "Change",
+    "summary.commands": "{count} commands trained",
+    "summary.untrained": "Nothing trained yet",
     "panel.profiles": "Trained profiles",
     "panel.no_headsets": "No headset listed. Turn yours on and hit Refresh.",
     "panel.connect_first": "Pick a headset first.",
@@ -168,8 +172,6 @@ const I18N = {
     "err.profile_load_failed": "Could not load profile {profile}. ({detail})",
     "err.profile_unload_failed":
       "Could not unload the profile {profile} that was already on the headset. ({detail})",
-    "err.profile_untrained":
-      "Profile {profile} has no trained action besides Neutral. Train at least one command in EMOTIV BCI first.",
     "err.subscribe_failed": "Cortex refused the {stream} stream. ({detail})",
     "err.timeout": "Cortex did not answer {method} in time.",
     "err.cortex_api": "Cortex error {api_code}: {detail}",
@@ -192,6 +194,112 @@ const I18N = {
 
     "log.sys_event": "Cortex system event: {detail}",
     "log.cortex_warning": "Cortex warning {warning_code}: {detail}",
+
+    // ── Training ──────────────────────────────────────────────────────────
+    "panel.training": "Training",
+    "panel.commands": "Commands",
+    "panel.brainmap": "Brain map",
+    "panel.brainmap.hint":
+      "Each command is drawn at its distance from Neutral. The further out it sits, the more easily the detector tells it apart from doing nothing.",
+    "panel.brainmap.empty": "Nothing trained yet.",
+
+    "quality.contact": "Contact quality",
+    "quality.eeg": "EEG quality",
+    "quality.waiting": "Waiting for the headset…",
+    "err.quality_unavailable":
+      "This headset does not provide the {stream} stream, so that part of the sensor quality panel stays empty. {detail}",
+    "quality.grade.0": "no signal",
+    "quality.grade.1": "very poor",
+    "quality.grade.2": "poor",
+    "quality.grade.3": "fair",
+    "quality.grade.4": "good",
+    "quality.verdict.good": "Sensors look good. Go ahead and train.",
+    "quality.verdict.fair": "Usable, but adjusting the sensors would make a cleaner recording.",
+    "quality.verdict.poor":
+      "Poor signal. Re-wet or reseat the sensors first — training on this teaches the profile the wrong thing.",
+
+    "cmd.enable": "Switch on",
+    "cmd.disable": "Switch off",
+    "cmd.times": "{count} recordings kept",
+    "cmd.erase.hint": "Delete every recording for this command.",
+    "cmd.slots_left": "{left} command slots left.",
+    "cmd.slots_full": "All {max} command slots are in use. Switch one off to add another.",
+
+    "btn.train": "Train",
+    "btn.retrain": "Train again",
+    "btn.erase": "Erase",
+    "btn.add_command": "Add",
+    "btn.new_profile": "New profile",
+    "btn.reset_all": "Reset all",
+    "btn.accept": "Keep",
+    "btn.discard": "Discard",
+    "btn.cancel": "Cancel",
+    "btn.create": "Create",
+
+    "confirm.erase": "Delete every recording for {action}?",
+    "confirm.reset_all":
+      "Erase all training in {profile}? Every command goes back to untrained.",
+
+    "profile.new.title": "New training profile",
+    "profile.new.hint": "It starts empty. Train Neutral first, then one command at a time.",
+
+    "train.phase.arming": "Getting ready",
+    "train.phase.recording": "Recording",
+    "train.phase.review": "Recorded",
+    "train.phase.failed": "Not usable",
+    "train.getready": "Sit still. Recording starts in a moment.",
+    "train.keep": "Keep this recording?",
+    "train.keep.hint": "Keeping it adds it to the profile. Discarding it changes nothing.",
+    "train.failed": "Cortex could not use that",
+    "train.failed.hint":
+      "Usually movement, or a sensor that lost contact. Check the quality above and record it again.",
+    "train.score": "Recording score",
+
+    "train.instr.neutral":
+      "Relax and think of nothing in particular. Stay still — this is the reference every command is measured against.",
+    "train.instr.push":
+      "Imagine pushing something away from you, and hold that same thought until the light stops changing.",
+    "train.instr.pull":
+      "Imagine pulling something towards you, and hold that same thought until the light stops changing.",
+    "train.instr.lift":
+      "Imagine lifting something upwards, and hold that same thought until the light stops changing.",
+    "train.instr.drop":
+      "Imagine pressing something downwards, and hold that same thought until the light stops changing.",
+    "train.instr.left":
+      "Imagine moving something to the left, and hold that same thought until the light stops changing.",
+    "train.instr.right":
+      "Imagine moving something to the right, and hold that same thought until the light stops changing.",
+    "train.instr.generic":
+      "Hold one steady thought for {action} until the light stops changing. Using the same thought every time is what makes it work.",
+
+    "stat.skill": "Skill rating",
+    "stat.threshold": "Threshold",
+    "stat.last_score": "Last score",
+
+    "tuning.training_feedback": "Light follows the training",
+    "tuning.training_feedback.hint":
+      "While a command records, the light starts on a calm blue and crosses to that command's own colour across the eight seconds. Neutral stays still on the blue.",
+
+    "status.creating_profile": "Creating profile {profile}…",
+    "status.profile_untrained": "Profile {profile} has nothing trained yet",
+    "log.profile_untrained":
+      "Profile {profile} has no trained command. Train Neutral first, then a command, in the Training panel.",
+
+    "err.too_many_actions": "Only {max} commands can be switched on at once. Switch one off first.",
+    "err.unknown_action": "Cortex does not know a command called {action}.",
+    "err.profile_name_empty": "Give the profile a name.",
+    "err.profile_exists": "A profile called {profile} already exists.",
+    "err.profile_create_failed": "Could not create the profile. {detail}",
+    "err.profile_save_failed":
+      "Could not save profile {profile}. Training is only kept once the profile saves. ({detail})",
+    "err.training_failed": "That training step failed. {detail}",
+    "err.commands_failed": "Could not read the profile's commands. {detail}",
+    "err.active_actions_failed": "Could not change which commands are switched on. {detail}",
+    "err.detection_info_failed": "Could not list the available commands. {detail}",
+    "err.trained_actions_failed": "Could not read the training counts. {detail}",
+    "err.brain_map_failed": "Could not read the brain map. {detail}",
+    "err.threshold_failed": "Could not read the training threshold. {detail}",
+    "err.skill_failed": "Could not read the skill rating. {detail}",
 
     "log.empty": "Nothing yet.",
     "running.yes": "Running",
@@ -231,7 +339,11 @@ const I18N = {
     "btn.close": "关闭",
     "btn.refresh": "刷新",
 
-    "panel.devices": "头戴设备",
+    "panel.devices": "设备",
+    "panel.headsets": "头戴设备",
+    "btn.change": "更换",
+    "summary.commands": "已训练 {count} 个指令",
+    "summary.untrained": "尚未训练任何内容",
     "panel.profiles": "已训练的配置文件",
     "panel.no_headsets": "未列出任何设备。请开机后点击「刷新」。",
     "panel.connect_first": "请先选择头戴设备。",
@@ -360,8 +472,6 @@ const I18N = {
     "err.profile_not_found": "此账号下不存在配置文件 {profile}。",
     "err.profile_load_failed": "无法加载配置文件 {profile}。（{detail}）",
     "err.profile_unload_failed": "无法卸载头戴设备上已有的配置文件 {profile}。（{detail}）",
-    "err.profile_untrained":
-      "配置文件 {profile} 除「中性」外没有已训练的动作。请先在 EMOTIV BCI 中训练至少一个指令。",
     "err.subscribe_failed": "Cortex 拒绝了 {stream} 数据流。（{detail}）",
     "err.timeout": "Cortex 未及时响应 {method}。",
     "err.cortex_api": "Cortex 错误 {api_code}：{detail}",
@@ -382,6 +492,103 @@ const I18N = {
 
     "log.sys_event": "Cortex 系统事件：{detail}",
     "log.cortex_warning": "Cortex 警告 {warning_code}：{detail}",
+
+    // ── 训练 ──────────────────────────────────────────────────────────────
+    "panel.training": "训练",
+    "panel.commands": "指令",
+    "panel.brainmap": "脑图",
+    "panel.brainmap.hint":
+      "每个指令按它与「中性」的距离绘制。离得越远，检测器越容易把它和「什么都不想」区分开。",
+    "panel.brainmap.empty": "尚未训练任何内容。",
+
+    "quality.contact": "接触质量",
+    "quality.eeg": "脑电质量",
+    "quality.waiting": "正在等待头戴设备…",
+    "err.quality_unavailable":
+      "此头戴设备不提供 {stream} 数据流，因此电极质量面板的这一部分会保持为空。{detail}",
+    "quality.grade.0": "无信号",
+    "quality.grade.1": "很差",
+    "quality.grade.2": "较差",
+    "quality.grade.3": "一般",
+    "quality.grade.4": "良好",
+    "quality.verdict.good": "电极状态良好，可以开始训练。",
+    "quality.verdict.fair": "勉强可用，调整一下电极会得到更干净的录制。",
+    "quality.verdict.poor":
+      "信号较差。请先重新润湿或调整电极——用这样的信号训练，只会让配置文件学到错误的模式。",
+
+    "cmd.enable": "启用",
+    "cmd.disable": "停用",
+    "cmd.times": "已保留 {count} 次录制",
+    "cmd.erase.hint": "删除该指令的全部录制。",
+    "cmd.slots_left": "还剩 {left} 个指令位。",
+    "cmd.slots_full": "{max} 个指令位已全部占用。请先停用一个再添加。",
+
+    "btn.train": "训练",
+    "btn.retrain": "重新训练",
+    "btn.erase": "清除",
+    "btn.add_command": "添加",
+    "btn.new_profile": "新建配置文件",
+    "btn.reset_all": "全部重置",
+    "btn.accept": "保留",
+    "btn.discard": "丢弃",
+    "btn.cancel": "取消",
+    "btn.create": "创建",
+
+    "confirm.erase": "删除「{action}」的全部录制？",
+    "confirm.reset_all": "清除 {profile} 中的全部训练？所有指令都将回到未训练状态。",
+
+    "profile.new.title": "新建训练配置文件",
+    "profile.new.hint": "新配置文件是空的。请先训练「中性」，然后逐个训练指令。",
+
+    "train.phase.arming": "准备中",
+    "train.phase.recording": "录制中",
+    "train.phase.review": "录制完成",
+    "train.phase.failed": "无法使用",
+    "train.getready": "请保持静止，马上开始录制。",
+    "train.keep": "保留这次录制？",
+    "train.keep.hint": "保留会把它加入配置文件；丢弃则不做任何改变。",
+    "train.failed": "Cortex 无法使用这次录制",
+    "train.failed.hint": "通常是动作过多，或电极接触不良。请检查上方质量后重新录制。",
+    "train.score": "本次得分",
+
+    "train.instr.neutral": "放松，不要特别想什么，并保持静止——这是衡量其他所有指令的基准。",
+    "train.instr.push": "想象把某个东西推离自己，并一直保持同一个念头，直到灯光不再变化。",
+    "train.instr.pull": "想象把某个东西拉向自己，并一直保持同一个念头，直到灯光不再变化。",
+    "train.instr.lift": "想象把某个东西向上抬起，并一直保持同一个念头，直到灯光不再变化。",
+    "train.instr.drop": "想象把某个东西向下压，并一直保持同一个念头，直到灯光不再变化。",
+    "train.instr.left": "想象把某个东西向左移动，并一直保持同一个念头，直到灯光不再变化。",
+    "train.instr.right": "想象把某个东西向右移动，并一直保持同一个念头，直到灯光不再变化。",
+    "train.instr.generic":
+      "为「{action}」保持一个稳定的念头，直到灯光不再变化。每次都用同一个念头，训练才会奏效。",
+
+    "stat.skill": "熟练度",
+    "stat.threshold": "阈值",
+    "stat.last_score": "上次得分",
+
+    "tuning.training_feedback": "让灯光跟随训练",
+    "tuning.training_feedback.hint":
+      "录制指令时，灯光会从平静的蓝色开始，在八秒内过渡到该指令自己的颜色。「中性」则始终保持这一片蓝色不动。",
+
+    "status.creating_profile": "正在创建配置文件 {profile}…",
+    "status.profile_untrained": "配置文件 {profile} 尚未训练任何内容",
+    "log.profile_untrained":
+      "配置文件 {profile} 还没有已训练的指令。请在「训练」面板中先训练「中性」，再训练一个指令。",
+
+    "err.too_many_actions": "同时最多只能启用 {max} 个指令，请先停用一个。",
+    "err.unknown_action": "Cortex 中不存在名为 {action} 的指令。",
+    "err.profile_name_empty": "请为配置文件取一个名称。",
+    "err.profile_exists": "已存在名为 {profile} 的配置文件。",
+    "err.profile_create_failed": "无法创建配置文件。{detail}",
+    "err.profile_save_failed":
+      "无法保存配置文件 {profile}。训练只有在配置文件保存后才会保留。（{detail}）",
+    "err.training_failed": "该训练步骤失败。{detail}",
+    "err.commands_failed": "无法读取配置文件中的指令。{detail}",
+    "err.active_actions_failed": "无法修改已启用的指令。{detail}",
+    "err.detection_info_failed": "无法获取可用指令列表。{detail}",
+    "err.trained_actions_failed": "无法读取训练次数。{detail}",
+    "err.brain_map_failed": "无法读取脑图。{detail}",
+    "err.threshold_failed": "无法读取训练阈值。{detail}",
+    "err.skill_failed": "无法读取熟练度评分。{detail}",
 
     "log.empty": "暂无记录。",
     "running.yes": "运行中",

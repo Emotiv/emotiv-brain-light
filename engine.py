@@ -12,7 +12,12 @@ from bulb_driver import SmoothBulb, find_bulb_ip
 from lights import DEFAULT_BRAND, LightError
 from config import Config
 from cortex_client import CortexClient
-from mapping import MentalCommandMapper, PerformanceMetricsMapper
+from mapping import (
+    TRAINING_SECONDS,
+    MentalCommandMapper,
+    PerformanceMetricsMapper,
+    TrainingLightMapper,
+)
 from palette import PERFORMANCE_METRIC_COLORS, PERFORMANCE_METRIC_KEYS
 from settings import settings
 
@@ -25,10 +30,12 @@ class Engine:
         self.cortex = CortexClient(self.emit)
         self.cortex.on_metrics = self._on_metrics
         self.cortex.on_command = self._on_command
+        self.cortex.on_training_event = self._on_training_event
 
         self.bulb: Optional[SmoothBulb] = None
         self.metrics_mapper = PerformanceMetricsMapper(Config)
         self.command_mapper = MentalCommandMapper(Config)
+        self.training_mapper = TrainingLightMapper(Config)
 
         self.loop: Optional[asyncio.AbstractEventLoop] = None
         self._thread: Optional[threading.Thread] = None
@@ -37,6 +44,11 @@ class Engine:
 
         self._last_push = 0.0
         self._last_target: Dict[str, Any] = {}
+        # Set for as long as the light belongs to a training window.
+        self._training_action: Optional[str] = None
+        # A concurrent future, not a Task: it is created with _submit so it can
+        # be started and cancelled from either thread.
+        self._training_task = None
 
     # ----------------------------------------------------------- infrastructure
     def emit(self, event: str, data: Dict[str, Any]):
@@ -44,6 +56,9 @@ class Engine:
         # become slot colours, before the UI hears about them.
         if event == "actions":
             self.command_mapper.set_actions(data.get("items", []))
+            # Training paints a command in the colour it will have when it
+            # fires, so both mappers work from one set of slot colours.
+            self.training_mapper.set_colors(self.command_mapper.color_map())
             data = dict(data, colors=self.command_mapper.color_map(),
                         order=self.command_mapper.actions)
         elif event == "fatal":
@@ -165,6 +180,7 @@ class Engine:
             self.cortex.stop()
         except Exception:
             pass
+        self._stop_training_light(settle=False)
         if self._cortex_task:
             self._cortex_task.cancel()
             self._cortex_task = None
@@ -202,6 +218,39 @@ class Engine:
     def set_sensitivity(self, values) -> Dict[str, Any]:
         return self._run_step(self.cortex.set_sensitivity(list(values)),
                               "err.sensitivity_failed", timeout=30.0)
+
+    # ---------------------------------------------------------- training
+    def create_profile(self, name: str) -> Dict[str, Any]:
+        return self._run_step(self.cortex.create_profile(name), "err.profile_create_failed")
+
+    def refresh_commands(self) -> Dict[str, Any]:
+        return self._run_step(self.cortex.refresh_commands(), "err.commands_failed", timeout=30.0)
+
+    def set_active_actions(self, actions) -> Dict[str, Any]:
+        return self._run_step(self.cortex.set_active_actions(list(actions)),
+                              "err.active_actions_failed")
+
+    def start_training(self, action: str) -> Dict[str, Any]:
+        # The eight-second window is not waited on here: it ends with a `sys`
+        # event, and blocking the UI thread on it would freeze the countdown
+        # the user is supposed to be watching.
+        return self._run_step(self.cortex.start_training(action), "err.training_failed")
+
+    def accept_training(self) -> Dict[str, Any]:
+        return self._run_step(self.cortex.accept_training(), "err.training_failed")
+
+    def reject_training(self) -> Dict[str, Any]:
+        return self._run_step(self.cortex.reject_training(), "err.training_failed")
+
+    def erase_training(self, action: str) -> Dict[str, Any]:
+        return self._run_step(self.cortex.erase_training(action), "err.training_failed")
+
+    def reset_training(self) -> Dict[str, Any]:
+        return self._run_step(self.cortex.reset_training(), "err.training_failed")
+
+    def training_result(self) -> Dict[str, Any]:
+        return self._run_step(self.cortex.emit_training_result(), "err.training_failed",
+                              timeout=30.0)
 
     def set_mode(self, mode: str, profile: str = "") -> Dict[str, Any]:
         settings.set("mode", mode)
@@ -244,7 +293,63 @@ class Engine:
         self._apply_target(self.metrics_mapper.update(values, active))
 
     def _on_command(self, action, power):
+        # A `com` reading during a training window is the detector guessing
+        # against a signature that is mid-change. Let the animation keep the
+        # light: it is showing the user what to do, which matters more than
+        # showing what the detector currently thinks.
+        if self._training_action:
+            return
         self._apply_target(self.command_mapper.update(action, power))
+
+    # -------------------------------------------------------------- training
+    def _on_training_event(self, event: str, action: str):
+        """Cortex's own timing drives the animation. Called on the engine loop."""
+        if event == "MC_Started":
+            self._start_training_light(action)
+        elif event in ("MC_Succeeded", "MC_Failed", "MC_Completed",
+                       "MC_Rejected", "MC_DataErased", "MC_Reset"):
+            self._stop_training_light(settle=event == "MC_Succeeded")
+
+    def _start_training_light(self, action: str):
+        if not settings.get("training_light_feedback", True):
+            return
+        self._stop_training_light(settle=False)
+        self._training_action = action or "neutral"
+        if not self.loop:
+            return
+        # `loop.create_task` only schedules when the caller is already on the
+        # loop thread, and silently does nothing otherwise — which left the
+        # light frozen on its first frame. `_submit` is safe from either side.
+        self._training_task = self._submit(self._run_training_light(self._training_action))
+
+    async def _run_training_light(self, action: str):
+        """Walk the window once, then hold the last frame until told to stop."""
+        started = time.monotonic()
+        try:
+            while True:
+                progress = (time.monotonic() - started) / TRAINING_SECONDS
+                self._apply_target(self.training_mapper.frame(action, progress))
+                if progress >= 1.0:
+                    # Cortex closes the window, not the clock: hold the final
+                    # colour until MC_Succeeded or MC_Failed actually lands.
+                    await asyncio.sleep(0.2)
+                    continue
+                await asyncio.sleep(0.04)
+        except asyncio.CancelledError:
+            raise
+
+    def _stop_training_light(self, settle: bool = False):
+        task, self._training_task = self._training_task, None
+        action, self._training_action = self._training_action, None
+        if task:
+            task.cancel()
+        if not action:
+            return
+        # Back to rest either way. A recording that succeeded gets one moment
+        # at its own colour first, which is the animation's only feedback.
+        self._apply_target(
+            self.training_mapper.frame(action, 1.0 if settle else 0.0)
+        )
 
     @staticmethod
     def metric_palette() -> Dict[str, str]:
