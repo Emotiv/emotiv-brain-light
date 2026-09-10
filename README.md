@@ -17,6 +17,99 @@ Two modes:
 .venv/bin/python app.py
 ```
 
+## 📥 Install and set up
+
+For someone installing the app. If you are working on the code, the source
+route is under [Setup](#setup).
+
+### 1. What you need first
+
+| | |
+|---|---|
+| **An EMOTIV headset** | Insight, EPOC, EPOC+ or EPOC X. |
+| **An EMOTIV account** | Free, at [emotiv.com](https://www.emotiv.com/). The Launcher and your API credentials both hang off it. |
+| **EMOTIV Launcher** | The desktop program that talks to the headset and runs the Cortex service this app connects to. Install it from your account and **sign in**. |
+| **A smart light** | A Yeelight or a LIFX bulb, on the same network as the computer. Yeelight also needs **LAN Control** enabled in its own app, and a 2.4 GHz network; LIFX needs nothing beyond being on the network. |
+| **A computer** | Windows 10/11, or a Mac with Apple Silicon. There is no phone version — the Launcher is a desktop program. |
+
+The Launcher has to be **running and signed in** whenever you use the app. It
+connects over `wss://localhost:6868`; no brain data leaves your machine.
+
+### 2. Create your own API credentials
+
+The app talks to Cortex as an *application*, and every person needs their own
+application key. They are free and take a minute to make.
+
+1. Sign in at [emotiv.com](https://www.emotiv.com/) and open
+   **[My Account → Cortex Apps](https://www.emotiv.com/my-account/cortex-apps/)**.
+2. Create a new application. Any name will do — it is only a label for your key.
+3. Copy the **Client ID** and the **Client Secret**.
+
+**The secret is shown once.** Copy it somewhere safe before closing the page; if
+you lose it, make a new application rather than hunting for it.
+
+Both go into **Settings** inside the app, and are stored only on your machine,
+in `~/.emotiv_brain_light/settings.json` with mode `600`.
+
+### 3. Install the app
+
+Download from the
+[latest release](https://github.com/Emotiv/emotiv-brain-light/releases/latest):
+
+| Platform | File |
+|---|---|
+| Windows 10/11 (x64) | `EMOTIV-Brain-Light-windows-x64-setup.exe` |
+| macOS 11+ (Apple Silicon) | `EMOTIV-Brain-Light-macos-arm64.dmg` |
+
+Intel Macs are not covered — the build is Apple Silicon only, and Rosetta does
+not help with an arm64 binary.
+
+Neither build is **code-signed**, so both operating systems object the first
+time. Nothing is wrong with the download; there is no certificate on it yet.
+
+**Windows.** Run the installer. It installs for your user only — no admin
+rights, no UAC prompt. SmartScreen shows *"Windows protected your PC"*: click
+**More info** → **Run anyway**.
+
+**macOS.** Open the `.dmg` and drag the app to **Applications** first. Do not
+run it from the mounted image: that volume is read-only and flagged, so
+Gatekeeper blocks it there and the flag cannot even be cleared.
+
+macOS marks downloads with a quarantine flag, which for an unsigned app usually
+appears as *"EMOTIV Brain Light is damaged and can't be opened"*. It is not
+damaged. Clear the flag once, in Terminal:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/EMOTIV Brain Light.app"
+```
+
+On macOS 15 and later the old right-click → *Open* trick no longer works for
+unnotarised apps, which is why the command above is the one to use. The GUI
+alternative is **System Settings → Privacy & Security → Open Anyway**, right
+after a blocked attempt.
+
+macOS also asks for **local network** permission on first run — allow it, or the
+app reaches neither the light nor Cortex.
+
+### 4. First run
+
+1. Start **EMOTIV Launcher**, sign in, and put the headset on.
+2. Open Brain Light. It asks for a **language**, then which **light brand** you
+   have.
+3. Open **Settings** and paste your **Client ID** and **Client Secret**. Leave
+   the light's IP blank and press **Scan network** to find it.
+4. Press **Start**. The app authorises, lists your headsets, and waits for you
+   to pick one.
+5. **Performance Metrics** runs as soon as the session opens. For **Mental
+   Commands**, pick a trained profile from the list — or create one with **New
+   profile** and train it right there, with the light as the cue.
+
+A profile must be trained on the *same headset model* you are using: an EPOC X
+profile will not load on an Insight, and the app says so on screen rather than
+failing quietly.
+
+---
+
 ## Colours
 
 **These are not invented colours.** They were extracted from the EMOTIV apps so
@@ -254,66 +347,77 @@ from the **Actions** tab, or push a `v*` tag to attach the results to a release.
 | Platform | Output |
 |---|---|
 | macOS (Apple Silicon) | `EMOTIV-Brain-Light-macos-arm64.dmg` |
-| Windows (x64) | `EMOTIV-Brain-Light-windows-x64.zip` |
+| Windows (x64) | `EMOTIV-Brain-Light-windows-x64-setup.exe` |
 
 Python and every library ship inside the bundle — end users install nothing.
 **EMOTIV Launcher is still required**, because Cortex is what the app talks to;
 packaging only removes the Python setup, not the EMOTIV software.
+
+To cut a release:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The tag triggers the workflow, which builds both platforms, creates the GitHub
+release and attaches both files to it. The tag minus its leading `v` becomes the
+version stamped into the Windows installer. Running the workflow from the
+**Actions** tab instead builds the same way, versions it `0.0.0` and leaves the
+results as workflow artifacts rather than publishing a release.
+
+What the build checks: on macOS it launches the bundle and fails if it exits
+within 20 seconds, which catches a module PyInstaller did not notice. On Windows
+it checks the output's shape instead — the `.exe`, the `_internal` folder, a
+plausible total size — because the window is a WebView2 control and the hosted
+runner has no reliable desktop session to create one in. Launch the Windows
+build by hand before announcing a release.
 
 To build locally:
 
 ```bash
 .venv/bin/pip install pyinstaller
 .venv/bin/pyinstaller packaging/EmotivBrainLight.spec --noconfirm
+iscc packaging/EmotivBrainLight.iss     # Windows installer, needs Inno Setup 6
 ```
+
+The icons are generated, not committed: `packaging/make_icon.py` builds the
+Windows `.ico`, the macOS `.icns` and the 512px window PNG from
+`assets/logo.png`, and the workflow runs it before PyInstaller. Change the logo
+and every icon follows on the next build. To refresh them locally:
+
+```bash
+.venv/bin/pip install pillow
+.venv/bin/python packaging/make_icon.py
+```
+
+The white-on-transparent artwork is composited onto the app's own dark rounded
+square, or it would vanish against a light taskbar; the EMOTIV wordmark is
+dropped below 256px and the rays around the bulb below 128px, where they stop
+being legible and only cost the bulb its size.
 
 ### Installing on a clean machine
 
-**Prerequisites, in order:**
+The download links, the credentials walkthrough and the Gatekeeper and
+SmartScreen steps are up in
+[Install and set up](#-install-and-set-up). Three things that section does not
+cover, because they only come up on a fresh machine:
 
-1. **EMOTIV Launcher installed, signed in, and running.** The app talks to the
-   Cortex service it provides. Packaging removes the Python setup, not this.
-2. **A Cortex application** at emotiv.com/my-account/cortex-apps, to get a
-   Client ID and secret. Each person needs their own, or shares one.
-3. **The light on the same subnet.** Yeelight also needs LAN Control enabled in
-   its app and a 2.4 GHz network; LIFX needs nothing beyond the same network.
+**The macOS application firewall needs no rule.** PyInstaller ad-hoc signs the
+bundle, and the firewall's default "automatically allow downloaded signed
+software" covers it. Music mode is the exception worth knowing about: it needs
+the bulb to open a connection *back* to this machine, so if that setting is off,
+allow the app when prompted.
 
-**Installing on macOS** — do not run the app from the mounted disk image. The
-DMG volume is mounted read-only and flagged `quarantine`, so Gatekeeper blocks
-it there and the flag cannot even be removed. Drag the app to `/Applications`
-first, then:
+**Windows needs the WebView2 runtime**, which the app draws its window with. It
+ships with Edge on current Windows 10 and 11, so it is almost always already
+there — and the installer checks and tells you if it is not, rather than letting
+the app open blank.
 
-```bash
-xattr -dr com.apple.quarantine "/Applications/EMOTIV Brain Light.app"
-```
-
-On macOS 15 and newer the old right-click → *Open* trick no longer works for
-unnotarised apps. The GUI route is **System Settings → Privacy & Security →
-Open Anyway**, right after the blocked attempt.
-
-macOS asks for **local network** permission on first run — allow it, or the app
-reaches neither the bulb nor Cortex.
-
-The macOS **application firewall** does not need a rule: PyInstaller ad-hoc signs
-the bundle, and the firewall's default "automatically allow downloaded signed
-software" covers it. Music mode needs the bulb to open a connection *back* to
-this machine, so if that setting is off, allow the app when prompted.
-
-**Installing on Windows** — unzip the whole folder and run
-`EMOTIV Brain Light.exe` from inside it; the executable depends on the
-`_internal/` folder beside it. SmartScreen shows "Windows protected your PC" the
-first time: *More info* → *Run anyway*.
-
-**First run** asks for a language, then the Cortex credentials under
-**Settings**. Leave the bulb IP blank and press **Scan network** to find it.
-
-**Windows** — SmartScreen shows "Windows protected your PC". Click *More info* →
-*Run anyway*. The app needs the WebView2 runtime, which ships with Edge on
-Windows 10 and 11.
-
-Signing would remove both prompts, but needs an Apple Developer ID certificate
-and a Windows code-signing certificate. Add `codesign_identity` in the spec and a
-notarisation step to the workflow once those exist.
+**Settings do not travel with the installer.** `~/.emotiv_brain_light/` holds
+the credentials, language, light address and last headset, and it is left alone
+by both installing and uninstalling. A machine you have tuned and a fresh
+install therefore behave differently unless the value has a default in the code.
 
 ### Supported lights
 
