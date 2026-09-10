@@ -18,6 +18,10 @@ IS_MAC = sys.platform == "darwin"
 def at(*parts):
     return os.path.join(ROOT, *parts)
 
+
+ICON_WIN = at("packaging", "app_icon.ico")
+ICON_MAC = at("packaging", "app_icon.icns")
+
 # pywebview loads its platform backend dynamically, so PyInstaller cannot see it
 # by static analysis. collect_all pulls the platform modules and their deps
 # (pyobjc on macOS, pythonnet/WebView2 on Windows).
@@ -70,7 +74,11 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=at("packaging", "icon.ico") if os.path.exists(at("packaging", "icon.ico")) else None,
+    # Built from assets/logo.png by packaging/make_icon.py, which the build
+    # workflow runs before PyInstaller. Not checked in -- derived artwork, and a
+    # stale committed icon is worse than none -- so a checkout that has not run
+    # it simply builds without one.
+    icon=ICON_WIN if os.path.exists(ICON_WIN) else None,
 )
 
 coll = COLLECT(
@@ -87,7 +95,7 @@ if IS_MAC:
     app = BUNDLE(
         coll,
         name=f"{APP_NAME}.app",
-        icon=at("packaging", "icon.icns") if os.path.exists(at("packaging", "icon.icns")) else None,
+        icon=ICON_MAC if os.path.exists(ICON_MAC) else None,
         bundle_identifier="com.emotiv.brainlight",
         info_plist={
             "CFBundleName": APP_NAME,
