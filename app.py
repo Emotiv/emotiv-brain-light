@@ -27,16 +27,27 @@ def resource_dir() -> str:
 
 
 class Api:
+    """Everything public on this object is callable from JavaScript.
+
+    pywebview builds the page's API by walking dir() of this object and
+    recursing into every attribute whose name does not start with an
+    underscore. With `window` and `engine` public it crawled the whole pywebview
+    Window, the asyncio loop and the Cortex client before letting the page
+    start, and the window never became responsive — measured on Windows with
+    pywebview 6.2.1, Responding=False from the first second. So all state is
+    underscored, and the only public names are the methods the page calls.
+    """
+
     def __init__(self):
-        self.window = None
-        self.engine = Engine(self.push_event)
+        self._window = None
+        self._engine = Engine(self._push_event)
         self._lock = threading.Lock()
-        # Set once the window starts closing. See push_event for why.
-        self.closing = False
+        # Set once the window starts closing. See _push_event for why.
+        self._closing = False
 
     # --------------------------------------------------------------- to the JS
-    def push_event(self, event: str, data: Dict[str, Any]):
-        if not self.window or self.closing:
+    def _push_event(self, event: str, data: Dict[str, Any]):
+        if not self._window or self._closing:
             # Never touch the webview while it is going away. pywebview runs the
             # `closing` handler synchronously on the UI thread, and evaluate_js
             # schedules work on that same thread and then blocks waiting for it.
@@ -46,7 +57,7 @@ class Api:
         payload = json.dumps({"event": event, "data": data}, ensure_ascii=False)
         try:
             # The JSON goes in as a literal so quote escaping cannot bite us.
-            self.window.evaluate_js(
+            self._window.evaluate_js(
                 f"(function(){{var m={payload};window.pushEvent(m.event,m.data);}})()"
             )
         except Exception:
@@ -58,8 +69,8 @@ class Api:
         return {
             "settings": settings.public_dict(),
             "metric_palette": Engine.metric_palette(),
-            "profiles": self.engine.cortex.profiles,
-            "running": self.engine.running,
+            "profiles": self._engine.cortex.profiles,
+            "running": self._engine.running,
         }
 
     def save_settings(self, values: Dict[str, Any]):
@@ -69,56 +80,56 @@ class Api:
         return settings.public_dict()
 
     def start(self):
-        return self.engine.start()
+        return self._engine.start()
 
     def stop(self):
-        return self.engine.stop()
+        return self._engine.stop()
 
     def set_mode(self, mode: str, profile: str = ""):
-        return self.engine.set_mode(mode, profile or "")
+        return self._engine.set_mode(mode, profile or "")
 
     def refresh_headsets(self):
-        return self.engine.refresh_headsets()
+        return self._engine.refresh_headsets()
 
     def select_headset(self, headset_id: str):
-        return self.engine.select_headset(headset_id)
+        return self._engine.select_headset(headset_id)
 
     def select_profile(self, name: str):
-        return self.engine.select_profile(name)
+        return self._engine.select_profile(name)
 
     def set_sensitivity(self, values):
-        return self.engine.set_sensitivity(values)
+        return self._engine.set_sensitivity(values)
 
     # --------------------------------------------------------------- training
     def create_profile(self, name: str):
-        return self.engine.create_profile(name)
+        return self._engine.create_profile(name)
 
     def refresh_commands(self):
-        return self.engine.refresh_commands()
+        return self._engine.refresh_commands()
 
     def set_active_actions(self, actions):
-        return self.engine.set_active_actions(actions or [])
+        return self._engine.set_active_actions(actions or [])
 
     def start_training(self, action: str):
-        return self.engine.start_training(action)
+        return self._engine.start_training(action)
 
     def accept_training(self):
-        return self.engine.accept_training()
+        return self._engine.accept_training()
 
     def reject_training(self):
-        return self.engine.reject_training()
+        return self._engine.reject_training()
 
     def erase_training(self, action: str):
-        return self.engine.erase_training(action)
+        return self._engine.erase_training(action)
 
     def reset_training(self):
-        return self.engine.reset_training()
+        return self._engine.reset_training()
 
     def training_result(self):
-        return self.engine.training_result()
+        return self._engine.training_result()
 
     def discover_bulb(self):
-        ip = self.engine.discover_bulb()
+        ip = self._engine.discover_bulb()
         if ip:
             settings.set("bulb_ip", ip)
             settings.save()
@@ -136,15 +147,15 @@ def main():
         min_size=(880, 620),
         background_color="#0c0e12",
     )
-    api.window = window
+    api._window = window
 
     def on_closing():
         # Order matters: silence the bridge first, then tear down. The teardown
         # emits status events, and any of them would deadlock the UI thread.
-        api.closing = True
+        api._closing = True
         try:
             # Without this the light keeps believing it is still in music mode.
-            api.engine.stop()
+            api._engine.stop()
         except Exception:
             pass
 

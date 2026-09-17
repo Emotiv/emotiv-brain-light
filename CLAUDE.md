@@ -24,6 +24,15 @@ with no headset and no light.
 
 ## Traps that already bit
 
+**Nothing public on `Api` except the methods the page calls.** pywebview
+exposes the js_api object by recursing into every attribute not starting with
+`_`. Public `window` and `engine` attributes sent it crawling through the
+pywebview Window and the asyncio loop, and on Windows with pywebview 6.2.1 the
+window never became responsive — `Responding=False` from the first second,
+py-spy showing the `generate_js_object` thread deep in `get_functions`.
+v1.0.0 shipped with this. CI did not catch it: the launch check only proves the
+process stays up, and a frozen window stays up too. Open release builds by hand.
+
 **Never emit UI events from the shutdown path.** pywebview runs `closing`
 synchronously on the UI thread, and cocoa's `evaluate_js` schedules work on that
 same thread then blocks for the result. Emitting during teardown deadlocks the
@@ -135,7 +144,8 @@ missing, and hands the user to the training panel.
 
 ## Still unverified
 
-- The Windows build has never been run — only built and inspected.
+- The Windows build has been run from source (window responsive after the
+  `Api` fix), but the packaged installer has not been opened by hand.
 - Training has only been exercised on a **virtual** headset. The API cycle is
   proven; whether a signature trained on real EEG through this UI performs as
   well as one trained in EmotivBCI is not.
